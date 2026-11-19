@@ -5,11 +5,12 @@ cd "$(dirname "$0")/.."
 DOMAIN="${1:?usage: scripts/deploy.sh <domain>}"
 
 [ -f .env ] || { echo "ERROR: .env missing"; exit 1; }
-[ -d "certbot/conf/live/$DOMAIN" ] || { echo "ERROR: no certificate for $DOMAIN, run scripts/get-cert.sh first"; exit 1; }
+sudo test -d "certbot/conf/live/$DOMAIN" || { echo "ERROR: no certificate for $DOMAIN, run scripts/get-cert.sh first"; exit 1; }
 command -v jq >/dev/null || { echo "ERROR: jq missing (sudo dnf install -y jq)"; exit 1; }
 
 # domain settings used by docker-compose.prod.yml and the backend
 sed -i '/^DOMAIN=/d;/^PUBLIC_URL=/d' .env
+[ -n "$(tail -c1 .env)" ] && echo >> .env
 printf 'DOMAIN=%s\nPUBLIC_URL=https://%s\n' "$DOMAIN" "$DOMAIN" >> .env
 
 # nginx config for this domain
