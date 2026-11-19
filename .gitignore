@@ -40,3 +40,6 @@ target/
 # Data and logs
 pgdata/
 *.log
+nginx/nginx.prod.conf
+certbot/
+keycloak/realm-prod/
