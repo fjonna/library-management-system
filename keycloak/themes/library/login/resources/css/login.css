@@ -1,0 +1,558 @@
+/*
+ * Library login theme — a thin CSS layer on top of the built-in keycloak.v2 theme.
+ *
+ * Every rule below is tied to a REAL, verified fact: either the real DOM of
+ * this realm's login page (curl .../auth/realms/library/protocol/openid-connect/auth?...)
+ * or the real PatternFly v5 source CSS shipped with this Keycloak
+ * (/auth/resources/.../vendor/patternfly-v5/patternfly.min.css), fetched and
+ * grepped directly. The wrapper chain from <body> to <input id="username">:
+ *
+ *   body#keycloak-bg
+ *     > div.pf-v5-c-login                  (display:flex; justify-content:center; padding-block only)
+ *       > div.pf-v5-c-login__container     (** the real narrowing culprit **)
+ *         > header.pf-v5-c-login__header   (duplicate brand text — hidden)
+ *         > main.pf-v5-c-login__main       (<- the ONE card)
+ *           > div.pf-v5-c-login__main-header   (h1#kc-page-title)
+ *           > div.pf-v5-c-login__main-body     (#kc-form > #kc-form-wrapper > form)
+ *             > div#kc-form
+ *               > div#kc-form-wrapper
+ *                 > form#kc-form-login.pf-v5-c-form.pf-v5-u-w-100
+ *                   > div.pf-v5-c-form__group
+ *                     > span.pf-v5-c-form-control
+ *                       > input#username
+ *           > div.pf-v5-c-login__main-footer   (registration link)
+ *
+ * The confirmed root cause of the narrow (~280px) card: PatternFly's real
+ * rule for .pf-v5-c-login__container is
+ *
+ *   .pf-v5-c-login__container{
+ *     max-width:31.25rem; width:100%;
+ *     display:grid;
+ *     grid-template-areas:"main header" "main footer" "main .";
+ *     grid-template-columns:<responsive custom property>;
+ *     padding-inline-end:6.125rem; padding-inline-start:6.125rem;   <- ~98px/side!
+ *   }
+ *
+ * i.e. a two-column grid (card + a second column for header/footer) with
+ * ~196px of total horizontal padding, set via the LOGICAL padding-inline-*
+ * properties — not the physical padding-left/right I was overriding before.
+ * .pf-v5-c-login__main-header and .pf-v5-c-login__main-body are also padded
+ * via padding-inline-*/padding-block-* logical properties for the same
+ * reason. Every rule below resets BOTH the physical and logical padding on
+ * every wrapper so nothing is missed either way.
+ */
+
+:root {
+  --library-accent: #4f46e5;
+  --library-accent-hover: #4338ca;
+  --library-text: #111827;
+  --library-muted: #6b7280;
+  --library-danger: #dc2626;
+  --library-radius: 20px;
+
+  /* frosted-glass card over a soft gradient — same tokens as the React landing page */
+  --library-gradient: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 50%, #bae6fd 100%);
+  --library-card-bg: rgba(255, 255, 255, 0.55);
+  --library-card-border: rgba(255, 255, 255, 0.6);
+  --library-input-bg: rgba(255, 255, 255, 0.85);
+  --library-border: rgba(17, 24, 39, 0.12);
+  --library-blob-1: #818cf8; /* indigo */
+  --library-blob-2: #67e8f9; /* cyan */
+  --library-blob-3: #a5b4fc; /* lighter indigo */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --library-text: #f3f4f6;
+    --library-muted: #9ca3af;
+    --library-gradient: linear-gradient(135deg, #0b1020 0%, #1e1b4b 50%, #0f172a 100%);
+    --library-card-bg: rgba(15, 23, 42, 0.55);
+    --library-card-border: rgba(255, 255, 255, 0.1);
+    --library-input-bg: rgba(30, 41, 59, 0.75);
+    --library-border: rgba(255, 255, 255, 0.12);
+    --library-blob-1: #4f46e5;
+    --library-blob-2: #22d3ee;
+    --library-blob-3: #312e81;
+  }
+}
+
+html,
+body {
+  background: var(--library-gradient) !important;
+  min-height: 100%;
+  color: var(--library-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ===== decorative blurred blobs, CSS only (no new DOM nodes available in a
+   Keycloak theme without a custom template, so ::before/::after is used) ===== */
+
+body::before,
+body::after,
+.pf-v5-c-login::before {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+body::before {
+  top: -10%;
+  left: -8%;
+  width: 22rem;
+  height: 22rem;
+  background: var(--library-blob-1);
+  opacity: 0.45;
+  animation: library-float-a 18s ease-in-out infinite;
+}
+
+body::after {
+  top: 28%;
+  right: -12%;
+  width: 24rem;
+  height: 24rem;
+  background: var(--library-blob-2);
+  opacity: 0.4;
+  animation: library-float-b 22s ease-in-out infinite;
+}
+
+.pf-v5-c-login::before {
+  bottom: -14%;
+  left: 20%;
+  width: 20rem;
+  height: 20rem;
+  background: var(--library-blob-3);
+  opacity: 0.4;
+  animation: library-float-c 20s ease-in-out infinite;
+}
+
+@keyframes library-float-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(24px, -28px);
+  }
+}
+@keyframes library-float-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-28px, 22px);
+  }
+}
+@keyframes library-float-c {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(18px, 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after,
+  .pf-v5-c-login::before {
+    animation: none;
+  }
+}
+
+/* ===== 1. .pf-v5-c-login — page-level centering flex box ===== */
+
+.pf-v5-c-login {
+  position: relative;
+  z-index: 1;
+  display: flex !important;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  padding: 16px !important;
+  padding-inline: 16px !important;
+  padding-block: 16px !important;
+}
+
+/* ===== 2. .pf-v5-c-login__container — THE narrowing culprit, neutralized ===== */
+/* Real rule: display:grid; grid-template-areas "main header"/"main footer"/"main .";
+   max-width:31.25rem; padding-inline-*:6.125rem. Killed entirely below. */
+
+.pf-v5-c-login__container {
+  display: block !important;
+  grid-template-columns: none !important;
+  grid-template-areas: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  padding-inline: 0 !important;
+  padding-block: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* ===== 3. header.pf-v5-c-login__header — duplicate brand column, hidden ===== */
+/* The h1 inside the card already shows "Sign in to Library" (see
+   loginAccountTitle in messages_en.properties) so this column is redundant. */
+
+.pf-v5-c-login__header {
+  display: none !important;
+}
+
+/* ===== 4. main.pf-v5-c-login__main — the ONE visible card ===== */
+
+.pf-v5-c-login__main {
+  position: relative;
+  z-index: 1;
+  display: block !important;
+  grid-area: auto !important;
+  align-self: auto !important;
+  width: min(420px, calc(100% - 32px)) !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 auto !important;
+  padding: 32px !important;
+  padding-inline: 32px !important;
+  padding-block: 32px !important;
+  /* frosted glass */
+  background: var(--library-card-bg) !important;
+  border: 1px solid var(--library-card-border) !important;
+  border-radius: var(--library-radius) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 25px 60px -15px rgba(79, 70, 229, 0.25) !important;
+}
+
+/* ===== 5. div.pf-v5-c-login__main-header — wraps the h1, needs spacing below it ===== */
+/* Real rule: display:grid; grid-template-columns:1fr auto; padding-inline-*/
+   padding-block-* (spacer--xl/2xl). Neutralized, with our own margin-bottom. */
+
+.pf-v5-c-login__main-header {
+  display: block !important;
+  grid-template-columns: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  padding-inline: 0 !important;
+  padding-block: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  margin: 0 0 24px 0 !important;
+  text-align: center;
+}
+
+.pf-v5-c-login__main-header h1,
+#kc-page-title {
+  display: block;
+  width: 100%;
+  margin: 0 !important;
+  color: var(--library-text) !important;
+  font-weight: 700 !important;
+  font-size: 1.5rem !important;
+  line-height: 1.3 !important;
+  white-space: normal;
+}
+
+/* fits on one line at desktop width; wraps normally only on very small screens */
+@media (min-width: 480px) {
+  .pf-v5-c-login__main-header h1,
+  #kc-page-title {
+    white-space: nowrap !important;
+  }
+}
+
+/* ===== 6. div.pf-v5-c-login__main-body — pure pass-through wrapper ===== */
+/* Real rule: padding-inline-*/padding-block-end (spacer--xl/2xl). Zeroed. */
+
+.pf-v5-c-login__main-body,
+#kc-form,
+#kc-form-wrapper {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  padding-inline: 0 !important;
+  padding-block: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* ===== 7. form#kc-form-login.pf-v5-c-form — real rule: display:grid; gap:var(--...) ===== */
+/* Verified: .pf-v5-c-form{display:grid;gap:var(--pf-v5-c-form--GridGap)}. That
+   grid gap stacked on top of margin-bottom on .pf-v5-c-form__group, and the
+   hidden credentialId <input> below is a real (non-display:none) grid item
+   that ate its own row + two extra gaps. Both neutralized. */
+
+.pf-v5-c-form {
+  display: grid !important;
+  --pf-v5-c-form--GridGap: 0;
+  gap: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+
+.pf-v5-c-form input[type="hidden"] {
+  display: none !important;
+}
+
+/* ===== 8. div.pf-v5-c-form__group — one row (label + control), own vertical rhythm ===== */
+
+.pf-v5-c-form__group {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  margin: 0 0 16px 0 !important;
+}
+
+/* the group that contains "Remember me" (confirmed: the only .pf-v5-c-helper-text
+   on this page lives in the password group, right before the button group) */
+.pf-v5-c-form__group:has(.pf-v5-c-helper-text) {
+  margin-bottom: 20px !important;
+}
+
+.pf-v5-c-form__group:last-child {
+  margin-bottom: 0 !important;
+}
+
+.pf-v5-c-form__actions {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.pf-v5-c-form__label-text {
+  color: var(--library-muted) !important;
+  font-weight: 500 !important;
+  font-size: 0.85rem;
+}
+
+/* ===== 9. span.pf-v5-c-form-control — the visible input pill (44px) ===== */
+
+.pf-v5-c-form-control {
+  display: flex !important;
+  align-items: center;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  height: 44px;
+  box-sizing: border-box;
+  background: var(--library-input-bg) !important;
+  border: 1px solid var(--library-border) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  padding: 0 12px !important;
+}
+
+.pf-v5-c-form-control input {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0;
+  color: var(--library-text);
+  font-size: 0.95rem;
+  line-height: normal;
+}
+
+.pf-v5-c-form-control:focus-within {
+  border-color: var(--library-accent) !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25) !important;
+}
+
+.pf-v5-c-form-control.pf-m-error,
+input[aria-invalid="true"] {
+  border-color: var(--library-danger) !important;
+}
+
+/* ===== 10. password field + eye button — one 44px pill, radius on outer corners only ===== */
+
+.pf-v5-c-input-group {
+  display: flex !important;
+  align-items: stretch;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  height: 44px;
+  box-sizing: border-box;
+  background: var(--library-input-bg) !important;
+  border: 1px solid var(--library-border) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+
+.pf-v5-c-input-group:focus-within {
+  border-color: var(--library-accent) !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25) !important;
+}
+
+.pf-v5-c-input-group .pf-v5-c-form-control {
+  height: 100%;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.pf-v5-c-input-group__item {
+  max-width: none !important;
+}
+
+.pf-v5-c-input-group__item.pf-m-fill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: var(--library-muted) !important;
+  padding: 0 12px !important;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button:hover {
+  color: var(--library-text) !important;
+}
+
+/* ===== remember me ===== */
+
+.pf-v5-c-form__helper-text,
+.pf-v5-c-helper-text {
+  width: 100% !important;
+  max-width: none !important;
+  margin-top: 0.6rem !important;
+}
+
+.pf-v5-c-check {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pf-v5-c-check__input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0 !important;
+  accent-color: var(--library-accent);
+}
+
+.pf-v5-c-check__label {
+  color: var(--library-muted) !important;
+  font-size: 0.875rem;
+}
+
+/* ===== primary button ===== */
+
+.pf-v5-c-button.pf-m-primary {
+  width: 100%;
+  background: var(--library-accent) !important;
+  border-color: var(--library-accent) !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.pf-v5-c-button.pf-m-primary:hover {
+  background: var(--library-accent-hover) !important;
+  border-color: var(--library-accent-hover) !important;
+}
+
+/* ===== 11. div.pf-v5-c-login__main-footer — registration link area ===== */
+/* Real rule: display:flex; flex-wrap:wrap; padding-block-end (spacer--3xl).
+   There are two of these in the DOM (one wraps #kc-registration, one is
+   empty) — both get the same treatment. */
+
+.pf-v5-c-login__main-footer {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  padding-inline: 0 !important;
+  padding-block: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  margin: 20px 0 0 0 !important;
+  text-align: center;
+}
+
+#kc-info,
+#kc-info-wrapper,
+#kc-registration-container,
+#kc-registration,
+.pf-v5-c-login__main-footer-band,
+.pf-v5-c-login__main-footer-band-item {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  padding-inline: 0 !important;
+  padding-block: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+#kc-registration,
+#kc-registration span {
+  color: var(--library-muted);
+  font-size: 0.875rem;
+}
+
+#kc-registration a {
+  color: var(--library-accent) !important;
+  font-weight: 600;
+}
+
+#kc-registration a:hover {
+  color: var(--library-accent-hover) !important;
+  text-decoration: underline;
+}
+
+/* ===== alerts / errors (login_error, invalid credentials, etc.) ===== */
+
+.pf-v5-c-alert {
+  width: 100% !important;
+  max-width: none !important;
+  border-radius: 10px !important;
+  margin-bottom: 1.25rem !important;
+}

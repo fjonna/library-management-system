@@ -1,186 +1,210 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { api, errMsg } from '../api';
+import BookFormModal from '../components/BookFormModal';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EmptyState from '../components/EmptyState';
+import { inputClass } from '../components/FormField';
+import PageHeader from '../components/PageHeader';
+import StatusBadge from '../components/StatusBadge';
+import { useToast } from '../components/Toast';
+import { formatDate, formatPrice } from '../format';
 import { STATUS_LABELS } from '../types';
 import type { Book, BookStatus } from '../types';
 
-const emptyForm = {
-  title: '',
-  author: '',
-  genre: '',
-  status: 'TO_READ' as BookStatus,
-  price: '',
-  pages: '',
-  isbn: '',
-};
-
 export default function BooksPage() {
+  const toast = useToast();
   const [books, setBooks] = useState<Book[]>([]);
-  const [form, setForm] = useState(emptyForm);
-  const [editId, setEditId] = useState<number | null>(null);
-  const [filter, setFilter] = useState('');
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [search, setSearch] = useState('');
+  const [genreFilter, setGenreFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Book | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       setBooks(await api<Book[]>('/api/books'));
-      setError('');
     } catch (e) {
-      setError(errMsg(e));
+      toast.show('error', errMsg(e));
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  function set<K extends keyof typeof emptyForm>(key: K, value: (typeof emptyForm)[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
+  function openAdd() {
+    setEditingBook(null);
+    setModalOpen(true);
   }
 
-  function startEdit(b: Book) {
-    setEditId(b.id);
-    setForm({
-      title: b.title,
-      author: b.author,
-      genre: b.genre ?? '',
-      status: b.status,
-      price: b.price === null ? '' : String(b.price),
-      pages: b.pages === null ? '' : String(b.pages),
-      isbn: b.isbn ?? '',
+  function openEdit(b: Book) {
+    setEditingBook(b);
+    setModalOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api(`/api/books/${deleteTarget.id}`, { method: 'DELETE' });
+      toast.show('success', `Deleted "${deleteTarget.title}".`);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      toast.show('error', errMsg(err));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const genres = useMemo(
+    () => [...new Set(books.map((b) => b.genre).filter((g): g is string => !!g))].sort(),
+    [books],
+  );
+
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return books.filter((b) => {
+      if (genreFilter && b.genre !== genreFilter) return false;
+      if (statusFilter && b.status !== statusFilter) return false;
+      if (q && ![b.title, b.author, b.genre ?? ''].some((v) => v.toLowerCase().includes(q))) return false;
+      return true;
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function reset() {
-    setEditId(null);
-    setForm(emptyForm);
-  }
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const body = {
-      title: form.title,
-      author: form.author,
-      genre: form.genre || null,
-      status: form.status,
-      price: form.price === '' ? null : Number(form.price),
-      pages: form.pages === '' ? null : Number(form.pages),
-      isbn: form.isbn || null,
-    };
-    try {
-      if (editId === null) {
-        await api('/api/books', { method: 'POST', body: JSON.stringify(body) });
-      } else {
-        await api(`/api/books/${editId}`, { method: 'PUT', body: JSON.stringify(body) });
-      }
-      reset();
-      await load();
-    } catch (err) {
-      setError(errMsg(err));
-    }
-  }
-
-  async function remove(b: Book) {
-    if (!window.confirm(`Delete "${b.title}"?`)) return;
-    try {
-      await api(`/api/books/${b.id}`, { method: 'DELETE' });
-      await load();
-    } catch (err) {
-      setError(errMsg(err));
-    }
-  }
-
-  const q = filter.trim().toLowerCase();
-  const shown = q
-    ? books.filter((b) =>
-        [b.title, b.author, b.genre ?? ''].some((v) => v.toLowerCase().includes(q)),
-      )
-    : books;
+  }, [books, search, genreFilter, statusFilter]);
 
   return (
-    <>
-      {error && <div className="error">{error}</div>}
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="My books"
+        description="Browse, search and manage everything in your library."
+        action={
+          <Button onClick={openAdd} icon={<Plus size={16} />}>
+            Add book
+          </Button>
+        }
+      />
 
-      <form className="card" onSubmit={submit}>
-        <h2>{editId === null ? 'Add a book' : 'Edit book'}</h2>
-        <div className="form-grid">
-          <label>
-            Title *
-            <input value={form.title} onChange={(e) => set('title', e.target.value)} required />
-          </label>
-          <label>
-            Author *
-            <input value={form.author} onChange={(e) => set('author', e.target.value)} required />
-          </label>
-          <label>
-            Genre
-            <input value={form.genre} onChange={(e) => set('genre', e.target.value)} />
-          </label>
-          <label>
-            Status
-            <select value={form.status} onChange={(e) => set('status', e.target.value as BookStatus)}>
-              {(Object.keys(STATUS_LABELS) as BookStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Price
-            <input type="number" min="0" step="0.01" value={form.price}
-              onChange={(e) => set('price', e.target.value)} />
-          </label>
-          <label>
-            Pages
-            <input type="number" min="1" value={form.pages}
-              onChange={(e) => set('pages', e.target.value)} />
-          </label>
-          <label>
-            ISBN
-            <input value={form.isbn} onChange={(e) => set('isbn', e.target.value)} />
-          </label>
+      <Card className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title, author or genre"
+            aria-label="Search books"
+            className={`${inputClass} pl-9`}
+          />
         </div>
-        <div className="form-actions">
-          <button className="btn" type="submit">
-            {editId === null ? 'Add book' : 'Save changes'}
-          </button>
-          {editId !== null && (
-            <button className="btn secondary" type="button" onClick={reset}>
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
+        <select
+          value={genreFilter}
+          onChange={(e) => setGenreFilter(e.target.value)}
+          aria-label="Filter by genre"
+          className={`${inputClass} sm:w-48`}
+        >
+          <option value="">All genres</option>
+          {genres.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
+          className={`${inputClass} sm:w-48`}
+        >
+          <option value="">All statuses</option>
+          {(Object.keys(STATUS_LABELS) as BookStatus[]).map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </Card>
 
-      <section className="card">
-        <h2>My books ({books.length})</h2>
-        <input className="filter" placeholder="Filter by title, author or genre"
-          value={filter} onChange={(e) => setFilter(e.target.value)} />
-        {shown.length === 0 ? (
-          <p className="empty">No books yet.</p>
+      <Card>
+        {loading ? (
+          <div className="flex flex-col gap-3" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+            ))}
+          </div>
+        ) : shown.length === 0 ? (
+          books.length === 0 ? (
+            <EmptyState
+              title="No books yet"
+              message="Add your first book to start building your library."
+              action={
+                <Button onClick={openAdd} icon={<Plus size={16} />}>
+                  Add book
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState title="No books match your filters" message="Try a different search or clear the filters." />
+          )
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Title</th><th>Author</th><th>Genre</th><th>Status</th>
-                  <th>Price</th><th>Pages</th><th></th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <tr className="border-b border-gray-200 dark:border-gray-800">
+                  <th className="px-3 py-2 font-medium">Title</th>
+                  <th className="px-3 py-2 font-medium">Author</th>
+                  <th className="px-3 py-2 font-medium">Genre</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Price</th>
+                  <th className="px-3 py-2 font-medium">Pages</th>
+                  <th className="px-3 py-2 font-medium">Added</th>
+                  <th className="px-3 py-2" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {shown.map((b) => (
-                  <tr key={b.id}>
-                    <td>{b.title}</td>
-                    <td>{b.author}</td>
-                    <td>{b.genre ?? '—'}</td>
-                    <td>{STATUS_LABELS[b.status]}</td>
-                    <td>{b.price ?? '—'}</td>
-                    <td>{b.pages ?? '—'}</td>
-                    <td className="actions">
-                      <button className="btn secondary small" onClick={() => startEdit(b)}>Edit</button>
-                      <button className="btn danger small" onClick={() => void remove(b)}>Delete</button>
+                  <tr key={b.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                    <td className="max-w-[220px] truncate px-3 py-2.5 font-medium" title={b.title}>
+                      {b.title}
+                    </td>
+                    <td className="max-w-[160px] truncate px-3 py-2.5 text-gray-600 dark:text-gray-300" title={b.author}>
+                      {b.author}
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{b.genre ?? '—'}</td>
+                    <td className="px-3 py-2.5">
+                      <StatusBadge status={b.status} />
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{formatPrice(b.price)}</td>
+                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{b.pages ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{formatDate(b.createdAt)}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(b)}
+                          aria-label={`Edit ${b.title}`}
+                          title="Edit"
+                          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(b)}
+                          aria-label={`Delete ${b.title}`}
+                          title="Delete"
+                          className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:text-red-400 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -188,7 +212,19 @@ export default function BooksPage() {
             </table>
           </div>
         )}
-      </section>
-    </>
+      </Card>
+
+      {modalOpen && <BookFormModal book={editingBook} onClose={() => setModalOpen(false)} onSaved={() => void load()} />}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete book"
+          message={`Delete "${deleteTarget.title}"? This cannot be undone.`}
+          loading={deleting}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
   );
 }

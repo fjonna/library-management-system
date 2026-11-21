@@ -17,7 +17,7 @@ let started: Promise<boolean> | null = null;
 export function initAuth(): Promise<boolean> {
   if (!started) {
     started = keycloak.init({
-      onLoad: 'login-required',
+      onLoad: 'check-sso',
       pkceMethod: 'S256',
       checkLoginIframe: false,
     });

@@ -16,9 +16,17 @@ printf 'DOMAIN=%s\nPUBLIC_URL=https://%s\n' "$DOMAIN" "$DOMAIN" >> .env
 # nginx config for this domain
 sed "s/__DOMAIN__/$DOMAIN/g" nginx/nginx.prod.conf.template > nginx/nginx.prod.conf
 
-# realm without the test users
+# realm without the test users; library-frontend gets only the production redirect/origin URIs
+# (re-run anytime: this regenerates the file from scratch, so it stays idempotent)
 mkdir -p keycloak/realm-prod
-jq 'del(.users)' keycloak/realm/library-realm.json > keycloak/realm-prod/library-realm.json
+jq --arg domain "$DOMAIN" '
+  del(.users)
+  | (.clients[] | select(.clientId == "library-frontend")) |= (
+      .redirectUris = ["https://" + $domain + "/*"]
+      | .webOrigins = ["https://" + $domain]
+      | .attributes["post.logout.redirect.uris"] = ("https://" + $domain + "/*")
+    )
+' keycloak/realm/library-realm.json > keycloak/realm-prod/library-realm.json
 
 C="docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.prod.yml"
 $C build backend     # one at a time: the server has only 2 GB of RAM

@@ -32,6 +32,7 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
     volumes:
       - ./keycloak/realm:/opt/keycloak/data/import:ro
+      - ./keycloak/themes:/opt/keycloak/themes/:ro
     depends_on:
       db:
         condition: service_healthy
