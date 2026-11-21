@@ -10,5 +10,10 @@ public enum Intent {
     COUNT_BOOKS,
     GENRE_BREAKDOWN,
     LIST_BOOKS,
+    BOOKS_UNDER_PRICE,
+    AVERAGE_PRICE,
+    TOP_AUTHOR,
+    RECENT_BOOKS,
+    SEARCH_TITLE,
     UNKNOWN
 }

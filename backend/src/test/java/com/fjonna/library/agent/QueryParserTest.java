@@ -63,4 +63,82 @@ class QueryParserTest {
     void unknownQuestion() {
         assertThat(parse("what is the weather").intent()).isEqualTo(Intent.UNKNOWN);
     }
+
+    @Test
+    void booksUnderPriceEnglish() {
+        QueryParser.Parsed p = parse("Show books under $20");
+        assertThat(p.intent()).isEqualTo(Intent.BOOKS_UNDER_PRICE);
+        assertThat(p.price()).isEqualByComparingTo("20");
+    }
+
+    @Test
+    void booksUnderPriceAlbanian() {
+        QueryParser.Parsed p = parse("Libra nën 15 euro");
+        assertThat(p.intent()).isEqualTo(Intent.BOOKS_UNDER_PRICE);
+        assertThat(p.price()).isEqualByComparingTo("15");
+    }
+
+    @Test
+    void averagePriceEnglish() {
+        assertThat(parse("What is the average price of my books?").intent()).isEqualTo(Intent.AVERAGE_PRICE);
+    }
+
+    @Test
+    void averagePriceAlbanian() {
+        assertThat(parse("Sa është çmimi mesatar i librave?").intent()).isEqualTo(Intent.AVERAGE_PRICE);
+    }
+
+    @Test
+    void topAuthorEnglish() {
+        assertThat(parse("Which author has the most books?").intent()).isEqualTo(Intent.TOP_AUTHOR);
+    }
+
+    @Test
+    void topAuthorAlbanian() {
+        assertThat(parse("Cili autor ka më shumë libra?").intent()).isEqualTo(Intent.TOP_AUTHOR);
+    }
+
+    @Test
+    void recentBooksEnglish() {
+        assertThat(parse("Show my most recent books").intent()).isEqualTo(Intent.RECENT_BOOKS);
+    }
+
+    @Test
+    void recentBooksAlbanian() {
+        assertThat(parse("Librat më të fundit").intent()).isEqualTo(Intent.RECENT_BOOKS);
+    }
+
+    @Test
+    void searchTitleEnglish() {
+        QueryParser.Parsed p = parse("Find the book titled Dune");
+        assertThat(p.intent()).isEqualTo(Intent.SEARCH_TITLE);
+        assertThat(p.searchText()).isEqualTo("dune");
+    }
+
+    @Test
+    void searchTitleAlbanian() {
+        QueryParser.Parsed p = parse("Kërko librin me titullin Dune");
+        assertThat(p.intent()).isEqualTo(Intent.SEARCH_TITLE);
+        assertThat(p.searchText()).isEqualTo("dune");
+    }
+
+    @Test
+    void ownerOfMostBooksAlbanian() {
+        assertThat(parse("Kush ka më shumë libra?").intent()).isEqualTo(Intent.MOST_BOOKS_OWNER);
+    }
+
+    @Test
+    void cheapestAlbanian() {
+        assertThat(parse("Cilat janë librat më të lirë?").intent()).isEqualTo(Intent.CHEAPEST);
+    }
+
+    @Test
+    void mostExpensiveAlbanian() {
+        assertThat(parse("Cilat janë librat më të shtrenjtë?").intent()).isEqualTo(Intent.TOP_EXPENSIVE);
+    }
+
+    @Test
+    void countBooksAlbanian() {
+        assertThat(parse("Sa libra kam?").intent()).isEqualTo(Intent.COUNT_BOOKS);
+    }
 }

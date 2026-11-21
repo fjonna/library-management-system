@@ -1,10 +1,12 @@
 package com.fjonna.library.agent;
 
 import com.fjonna.library.book.BookStatus;
+import java.math.BigDecimal;
 import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +90,47 @@ public class AgentRepository {
         return run("select coalesce(b.genre, 'Unknown') as \"Genre\", count(*) as \"Books\""
             + " from books b join users u on u.id = b.user_id" + w.sql()
             + " group by 1 order by 2 desc, 1", w.params());
+    }
+
+    public Table booksUnderPrice(Filter f, boolean admin, BigDecimal maxPrice, int limit) {
+        Where w = where(f);
+        String sql = "select b.id as \"ID\", b.title as \"Title\", b.author as \"Author\", b.genre as \"Genre\","
+            + " b.status as \"Status\", b.price as \"Price\", b.pages as \"Pages\""
+            + (admin ? ", u.username as \"Owner\"" : "")
+            + " from books b join users u on u.id = b.user_id"
+            + w.sql() + " and b.price is not null and b.price <= :maxPrice"
+            + " order by b.price asc, b.id limit :lim";
+        w.params().put("maxPrice", maxPrice);
+        w.params().put("lim", limit);
+        return run(sql, w.params());
+    }
+
+    public Table averagePrice(Filter f) {
+        Where w = where(f);
+        return run("select round(avg(b.price), 2) as \"Average price\", count(b.price) as \"Priced books\""
+            + " from books b join users u on u.id = b.user_id" + w.sql() + " and b.price is not null", w.params());
+    }
+
+    public Table topAuthor(Filter f, int limit) {
+        Where w = where(f);
+        return run("select b.author as \"Author\", count(*) as \"Books\""
+            + " from books b join users u on u.id = b.user_id" + w.sql()
+            + " group by b.author order by 2 desc, 1 limit :lim", w.params());
+    }
+
+    public Table searchTitle(Filter f, boolean admin, String text, int limit) {
+        Where w = where(f);
+        String pattern = "%" + text.toLowerCase(Locale.ROOT)
+            .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        String sql = "select b.id as \"ID\", b.title as \"Title\", b.author as \"Author\", b.genre as \"Genre\","
+            + " b.status as \"Status\", b.price as \"Price\", b.pages as \"Pages\""
+            + (admin ? ", u.username as \"Owner\"" : "")
+            + " from books b join users u on u.id = b.user_id"
+            + w.sql() + " and lower(b.title) like :pattern"
+            + " order by b.created_at desc, b.id limit :lim";
+        w.params().put("pattern", pattern);
+        w.params().put("lim", limit);
+        return run(sql, w.params());
     }
 
     /** Admin only (enforced in AgentService). */

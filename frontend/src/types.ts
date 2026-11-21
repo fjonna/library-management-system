@@ -29,10 +29,37 @@ export interface UserSummary {
 
 export type Cell = string | number | null;
 
+export interface RecommendationItem {
+  title: string;
+  author: string;
+  genre: string | null;
+  reason: string;
+}
+
 export interface QueryResult {
   intent: string;
+  understoodAs: string;
   title: string;
   summary: string;
   columns: string[];
   rows: Cell[][];
+}
+
+export interface InsightStats {
+  totalBooks: number;
+  finished: number;
+  reading: number;
+  toRead: number;
+  averagePrice: number | null;
+  averagePages: number | null;
+  topGenre: string | null;
+}
+
+export interface InsightResponse {
+  stats: InsightStats;
+  sentences: string[];
+}
+
+export interface InsightSummaryResponse {
+  summary: string;
 }

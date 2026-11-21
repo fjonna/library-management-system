@@ -74,9 +74,28 @@ export default function AgentPage() {
 
       {result && (
         <section className="card">
+          {result.understoodAs && <div className="chip understood">{result.understoodAs}</div>}
           <h2>{result.title}</h2>
           <div className="summary">{result.summary}</div>
-          {result.columns.length > 0 && <ResultTable columns={result.columns} rows={result.rows} />}
+          {result.intent === 'UNKNOWN' ? (
+            <div className="chips">
+              {result.rows.map((row) => (
+                <button
+                  key={String(row[0])}
+                  className="chip"
+                  type="button"
+                  onClick={() => {
+                    setQuestion(String(row[0]));
+                    void ask(String(row[0]));
+                  }}
+                >
+                  {row[0]}
+                </button>
+              ))}
+            </div>
+          ) : (
+            result.columns.length > 0 && <ResultTable columns={result.columns} rows={result.rows} />
+          )}
         </section>
       )}
     </>

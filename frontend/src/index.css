@@ -78,5 +78,31 @@ td.actions { display: flex; gap: 6px; }
   padding: 5px 12px; font: inherit; font-size: .85rem; cursor: pointer;
 }
 .chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.understood {
+  display: inline-block; cursor: default; margin-bottom: 10px;
+  background: var(--accent-soft); color: var(--accent); border-color: transparent;
+}
+.chip.understood:hover { color: var(--accent); }
 .fatal { padding: 40px; text-align: center; color: var(--danger); }
 .filter { max-width: 260px; margin-bottom: 12px; }
+
+.rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.rec-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.rec-card h3 { font-size: 1rem; margin-bottom: 4px; }
+.rec-meta { color: var(--muted); font-size: .85rem; margin-bottom: 8px; }
+.rec-reason { color: var(--accent); font-size: .85rem; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; text-align: center; }
+.tile-value { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+.tile-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
+.insight-list { margin: 0 0 16px; padding-left: 18px; }
+.insight-list li { margin-bottom: 6px; }
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .4);
+  display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+}
+.modal { max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; margin-bottom: 0; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
