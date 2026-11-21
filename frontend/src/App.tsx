@@ -4,8 +4,10 @@ import { currentUsername, isAdmin, keycloak } from './keycloak';
 import AdminPage from './pages/AdminPage';
 import AgentPage from './pages/AgentPage';
 import BooksPage from './pages/BooksPage';
+import InsightsPage from './pages/InsightsPage';
+import RecommendationsPage from './pages/RecommendationsPage';
 
-type Tab = 'books' | 'agent' | 'admin';
+type Tab = 'books' | 'agent' | 'recommendations' | 'insights' | 'admin';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('books');
@@ -27,6 +29,15 @@ export default function App() {
           <button className={tab === 'agent' ? 'active' : ''} onClick={() => setTab('agent')}>
             Ask the library
           </button>
+          <button
+            className={tab === 'recommendations' ? 'active' : ''}
+            onClick={() => setTab('recommendations')}
+          >
+            Recommended for you
+          </button>
+          <button className={tab === 'insights' ? 'active' : ''} onClick={() => setTab('insights')}>
+            Insights
+          </button>
           {admin && (
             <button className={tab === 'admin' ? 'active' : ''} onClick={() => setTab('admin')}>
               Admin
@@ -47,6 +58,8 @@ export default function App() {
       <main>
         {tab === 'books' && <BooksPage />}
         {tab === 'agent' && <AgentPage />}
+        {tab === 'recommendations' && <RecommendationsPage />}
+        {tab === 'insights' && <InsightsPage />}
         {tab === 'admin' && admin && <AdminPage />}
       </main>
     </>

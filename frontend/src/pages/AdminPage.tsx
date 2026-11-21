@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, errMsg } from '../api';
+import InsightsView from '../components/InsightsView';
 import { STATUS_LABELS } from '../types';
 import type { Book, UserSummary } from '../types';
 
@@ -7,6 +8,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [error, setError] = useState('');
+  const [insightsUser, setInsightsUser] = useState<UserSummary | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +66,7 @@ export default function AdminPage() {
                   <td>{u.email}</td>
                   <td>{u.bookCount}</td>
                   <td className="actions">
+                    <button className="btn secondary small" onClick={() => setInsightsUser(u)}>Insights</button>
                     <button className="btn danger small" onClick={() => void removeUser(u)}>Delete</button>
                   </td>
                 </tr>
@@ -105,6 +108,21 @@ export default function AdminPage() {
           </div>
         )}
       </section>
+
+      {insightsUser && (
+        <div className="modal-overlay" onClick={() => setInsightsUser(null)}>
+          <div className="modal card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{insightsUser.username}&apos;s insights</h2>
+              <button className="btn secondary small" onClick={() => setInsightsUser(null)}>Close</button>
+            </div>
+            <InsightsView
+              basePath={`/api/admin/insights/${insightsUser.id}`}
+              summarizeLabel={`Summarize ${insightsUser.username}'s reading habits`}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
