@@ -54,7 +54,7 @@ export default function AdminPage() {
     setDeleting(true);
     try {
       await api(`/api/admin/users/${deleteUserTarget.id}`, { method: 'DELETE' });
-      toast.show('success', `Deleted user "${deleteUserTarget.username}".`);
+      toast.show('success', `Removed user data for "${deleteUserTarget.username}".`);
       setDeleteUserTarget(null);
       await load();
     } catch (e) {
@@ -82,7 +82,7 @@ export default function AdminPage() {
   const shownUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
     if (!q) return users;
-    return users.filter((u) => [u.username, u.email].some((v) => v.toLowerCase().includes(q)));
+    return users.filter((u) => [u.username, u.email].some((v) => (v ?? '').toLowerCase().includes(q)));
   }, [users, userSearch]);
 
   const shownBooks = useMemo(() => {
@@ -165,8 +165,8 @@ export default function AdminPage() {
                             type="button"
                             onClick={() => setDeleteUserTarget(u)}
                             disabled={isSelf}
-                            title={isSelf ? 'You cannot delete yourself' : 'Delete user'}
-                            aria-label={`Delete ${u.username}`}
+                            title={isSelf ? 'You cannot remove your own user data' : 'Remove user data'}
+                            aria-label={`Remove user data for ${u.username}`}
                             className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-red-400 dark:hover:bg-red-950/40"
                           >
                             <Trash2 size={16} />
@@ -266,8 +266,9 @@ export default function AdminPage() {
 
       {deleteUserTarget && (
         <ConfirmDialog
-          title="Delete user"
-          message={`Delete user "${deleteUserTarget.username}" and all their books? This cannot be undone.`}
+          title="Remove user data"
+          message="This removes the user's books and profile from the library. Their login account is managed in Keycloak and is not deleted."
+          confirmLabel="Remove user data"
           loading={deleting}
           onConfirm={() => void confirmDeleteUser()}
           onCancel={() => setDeleteUserTarget(null)}
