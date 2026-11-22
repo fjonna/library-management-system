@@ -454,13 +454,28 @@ input[aria-invalid="true"] {
   color: var(--library-text) !important;
 }
 
-/* ===== remember me ===== */
+/* ===== remember me + forgot password ===== */
+/* Real DOM (confirmed): .pf-v5-c-helper-text already carries PatternFly's own
+   pf-v5-u-display-flex / pf-v5-u-justify-content-space-between utility classes
+   (defined with !important in patternfly-addons.css), which is why "Remember
+   me" and "Forgot Password?" already sit on one row today. Made explicit (and
+   wrap-safe) here instead of relying on that alone, since nothing in this file
+   guaranteed it and nothing styled the link at all. */
 
 .pf-v5-c-form__helper-text,
 .pf-v5-c-helper-text {
   width: 100% !important;
   max-width: none !important;
   margin-top: 0.6rem !important;
+}
+
+.pf-v5-c-helper-text {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  row-gap: 0.5rem !important;
+  column-gap: 1rem !important;
 }
 
 .pf-v5-c-check {
@@ -481,6 +496,24 @@ input[aria-invalid="true"] {
   font-size: 0.95rem !important;
 }
 
+/* "Forgot Password?" link (reset-credentials, only rendered when the realm's
+   resetPasswordAllowed is true) — same accent-color/hover-underline pattern
+   already used for #kc-registration a below, so it reads as part of one theme
+   and stays legible in both light and dark mode (--library-accent is the same
+   indigo in both color-scheme blocks at the top of this file). */
+.pf-v5-c-helper-text__item a {
+  color: var(--library-accent) !important;
+  font-size: 0.95rem !important;
+  font-weight: 600;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.pf-v5-c-helper-text__item a:hover {
+  color: var(--library-accent-hover) !important;
+  text-decoration: underline !important;
+}
+
 /* ===== primary button ===== */
 
 .pf-v5-c-button.pf-m-primary {
@@ -497,6 +530,27 @@ input[aria-invalid="true"] {
 .pf-v5-c-button.pf-m-primary:hover {
   background: var(--library-accent-hover) !important;
   border-color: var(--library-accent-hover) !important;
+}
+
+/* "« Back to Login" on the reset-credentials ("Forgot Your Password?") page —
+   same pill size/font as the primary Submit button above it, outlined instead
+   of filled so it still reads as secondary. pf-m-block (real DOM, both buttons)
+   already makes it width:100%, stacking it under Submit via the real
+   .pf-v5-c-form__actions{display:flex;flex-wrap:wrap} rule. */
+.pf-v5-c-button.pf-m-secondary {
+  height: 44px !important;
+  border: 1px solid var(--library-border) !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  color: var(--library-text) !important;
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+}
+
+.pf-v5-c-button.pf-m-secondary:hover {
+  border-color: var(--library-accent) !important;
+  color: var(--library-accent) !important;
+  background: var(--library-input-bg) !important;
 }
 
 /* ===== 11. div.pf-v5-c-login__main-footer — registration link area ===== */
@@ -534,6 +588,16 @@ input[aria-invalid="true"] {
   border: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
+}
+
+/* reset-credentials "Enter your username or email..." line: its <span> carries
+   PatternFly's own pf-v5-u-font-size-sm/pf-v5-u-color-200 utility classes
+   (confirmed in the real DOM, both !important), which is a different, smaller
+   size than every other helper/footer line in this theme. Matched to the same
+   0.95rem convention here. */
+#kc-info-wrapper span {
+  color: var(--library-muted) !important;
+  font-size: 0.95rem !important;
 }
 
 #kc-registration,
