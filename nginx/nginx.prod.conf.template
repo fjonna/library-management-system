@@ -21,7 +21,14 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+    # None of the locations below define their own add_header, so they all inherit
+    # every header set above (nginx only drops inherited add_header directives when
+    # a location defines at least one of its own). If that ever changes for a
+    # location, repeat these four add_header lines there too.
     location /auth/ {
         proxy_pass http://keycloak:8080;
         proxy_set_header Host $host;
