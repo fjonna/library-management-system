@@ -1,5 +1,7 @@
 # Library Management System
 
+[![CI](https://github.com/fjonna/library-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/fjonna/library-management-system/actions/workflows/ci.yml)
+
 A small full-stack app for keeping track of the books you own and read. Users manage their own books, admins see everything, and there's a "Ask the library" box where you type a question in plain English or Albanian and get a table back.
 
 [**Live demo →**](https://fjonna-library.duckdns.org)
