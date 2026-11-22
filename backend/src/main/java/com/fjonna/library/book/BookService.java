@@ -4,6 +4,7 @@ import com.fjonna.library.user.User;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,8 +22,18 @@ public class BookService {
     }
 
     @Transactional(readOnly = true)
+    public List<BookResponse> listForUser(UUID userId, Pageable pageable) {
+        return bookRepository.findByOwner(userId, pageable).stream().map(BookResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<BookResponse> listAll() {
         return bookRepository.findAllWithOwner().stream().map(BookResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookResponse> listAll(Pageable pageable) {
+        return bookRepository.findAllWithOwner(pageable).stream().map(BookResponse::from).toList();
     }
 
     @Transactional

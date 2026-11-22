@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,9 +32,14 @@ public class AdminController {
     private final BookService bookService;
     private final UserRepository userRepository;
 
+    /** page/size are optional; omitting both keeps today's "return everything" behavior for the frontend. */
     @GetMapping("/books")
-    public List<BookResponse> allBooks() {
-        return bookService.listAll();
+    public List<BookResponse> allBooks(@RequestParam(required = false) Integer page,
+                                       @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            return bookService.listAll();
+        }
+        return bookService.listAll(Paging.of(page, size));
     }
 
     @PutMapping("/books/{id}")
@@ -47,9 +53,14 @@ public class AdminController {
         bookService.delete(null, true, id);
     }
 
+    /** page/size are optional; omitting both keeps today's "return everything" behavior for the frontend. */
     @GetMapping("/users")
-    public List<UserSummary> allUsers() {
-        return userRepository.findAllSummaries();
+    public List<UserSummary> allUsers(@RequestParam(required = false) Integer page,
+                                      @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            return userRepository.findAllSummaries();
+        }
+        return userRepository.findAllSummaries(Paging.of(page, size));
     }
 
     /** Removes the user and their books from the library DB (not from Keycloak). */

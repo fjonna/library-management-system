@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,9 +31,16 @@ public class BookController {
     private final BookService bookService;
     private final UserService userService;
 
+    /** page/size are optional; omitting both keeps today's "return everything" behavior for the frontend. */
     @GetMapping
-    public List<BookResponse> list(@AuthenticationPrincipal Jwt jwt) {
-        return bookService.listForUser(UUID.fromString(jwt.getSubject()));
+    public List<BookResponse> list(@AuthenticationPrincipal Jwt jwt,
+                                   @RequestParam(required = false) Integer page,
+                                   @RequestParam(required = false) Integer size) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        if (page == null && size == null) {
+            return bookService.listForUser(userId);
+        }
+        return bookService.listForUser(userId, Paging.of(page, size));
     }
 
     @PostMapping
