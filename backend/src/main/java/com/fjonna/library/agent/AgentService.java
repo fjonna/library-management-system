@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,12 @@ public class AgentService {
     private static final int MAX_EXAMPLES_USER = 6;
     private static final int MAX_EXAMPLES_ADMIN = 8;
     private static final Random RANDOM = new Random();
+
+    /** Pure grammar/function words excluded from "did you mean" scoring so they don't inflate overlap. */
+    private static final Set<String> STOPWORDS = Set.of(
+        "what", "is", "the", "a", "an", "of", "my", "i", "do", "does", "did", "are", "am", "to",
+        "in", "on", "for", "and", "it", "this", "that", "have", "has", "me", "you",
+        "cili", "cila", "eshte", "te", "e", "dhe", "per", "ne", "nga", "kam", "ka", "kjo", "une");
 
     /** Safe for any user to ask: never ranks or lists other users. */
     public static final List<String> COMMON_EXAMPLES = List.of(
@@ -50,6 +57,11 @@ public class AgentService {
     private final QueryParser parser;
     private final AgentRepository repo;
 
+    /** Pure helpers for the generic (slot-based) engine used once the legacy intent lookup says UNKNOWN. */
+    private final SpecParser specHelper = new SpecParser();
+    private final SqlBuilder sqlBuilder = new SqlBuilder();
+    private final SummaryFormatter summaryFormatter = new SummaryFormatter();
+
     /** Role-aware, shuffled subset for the "examples" endpoint and chip suggestions. */
     public List<String> examples(boolean admin) {
         return pickExamples(admin, admin ? MAX_EXAMPLES_ADMIN : MAX_EXAMPLES_USER);
@@ -65,7 +77,9 @@ public class AgentService {
     @Transactional(readOnly = true)
     public QueryResult answer(UUID userId, boolean admin, String question) {
         UUID scope = admin ? null : userId;
-        Parsed p = parser.parse(question, repo.genres(scope), repo.authors(scope));
+        List<String> genres = repo.genres(scope);
+        List<String> authors = repo.authors(scope);
+        Parsed p = parser.parse(question, genres, authors);
         Filter f = new Filter(scope, p.genre(), p.author(), p.status());
         int limit = p.limit() == null ? 0 : Math.min(Math.max(p.limit(), 1), MAX_ROWS);
         int top = limit == 0 ? 5 : limit;
@@ -150,13 +164,83 @@ public class AgentService {
                     ? "No books with a title matching '" + p.searchText() + "' found " + where + "."
                     : "Found " + t.rows().size() + " book(s) matching '" + p.searchText() + "' " + where + ".");
             }
-            case UNKNOWN -> {
-                List<String> picked = pickExamples(admin, 3);
-                yield new QueryResult(p.intent().name(), understood, "I did not understand that",
-                    "Try one of these questions.", List.of("Example questions"),
-                    picked.stream().map(e -> List.<Object>of(e)).toList(), true);
-            }
+            case UNKNOWN -> handleUnknown(question, genres, authors, scope, admin);
         };
+    }
+
+    /**
+     * The legacy intent lookup gave up: try the general slot-based engine (any aggregate/field/
+     * filter/groupBy combination {@link SpecParser} can recognize) before giving up for good.
+     */
+    private QueryResult handleUnknown(String question, List<String> genres, List<String> authors,
+                                       UUID scope, boolean admin) {
+        QuerySpec spec = parser.toSpec(question, genres, authors);
+        if (specHelper.isEmpty(spec)) {
+            return unknownResult(admin, question);
+        }
+        if (spec.groupBy() == GroupBy.USER && !admin) {
+            return adminOnly();
+        }
+        Table t = repo.run(sqlBuilder.build(spec, scope, admin));
+        return genericResult(spec, admin, t);
+    }
+
+    private QueryResult genericResult(QuerySpec spec, boolean admin, Table t) {
+        String understood = summaryFormatter.understoodAs(spec, admin);
+        String title = summaryFormatter.title(spec);
+        String label = "QUERY_" + spec.aggregate()
+            + (spec.field() != null ? "_" + spec.field() : "")
+            + (spec.groupBy() != null ? "_BY_" + spec.groupBy() : "");
+        String summary = spec.groupBy() != null
+            ? summaryFormatter.groupSummary(spec, admin, t)
+            : switch (spec.aggregate()) {
+                case SUM, AVG, MIN, MAX -> {
+                    List<Object> row = t.rows().get(0);
+                    yield summaryFormatter.scalarSummary(spec, admin, row.get(0), ((Number) row.get(1)).longValue());
+                }
+                case COUNT -> summaryFormatter.countSummary(spec, admin, ((Number) t.rows().get(0).get(0)).longValue());
+                case LIST -> summaryFormatter.listSummary(spec, admin, t);
+                case GROUP_COUNT -> summaryFormatter.groupSummary(spec, admin, t);
+            };
+        return new QueryResult(label, understood, title, summary, t.columns(), t.rows(), false);
+    }
+
+    /** No spec signal at all: suggest a close example (edit-distance word overlap) when one exists. */
+    private QueryResult unknownResult(boolean admin, String question) {
+        List<String> pool = new ArrayList<>(COMMON_EXAMPLES);
+        if (admin) pool.addAll(ADMIN_ONLY_EXAMPLES);
+        List<String> qWords = Normalizer.words(Normalizer.normalize(question));
+        List<String> ranked = rankByCloseness(qWords, pool);
+        boolean hasMatch = !ranked.isEmpty() && wordOverlap(qWords, ranked.get(0)) >= 2;
+        String summary = hasMatch
+            ? "Did you mean: " + ranked.get(0) + "?"
+            : "Try one of these questions.";
+        List<String> picked = hasMatch ? ranked.subList(0, Math.min(3, ranked.size())) : pickExamples(admin, 3);
+        return new QueryResult(Intent.UNKNOWN.name(), "I could not understand that question", "I did not understand that",
+            summary, List.of("Example questions"), picked.stream().map(e -> List.<Object>of(e)).toList(), true);
+    }
+
+    /** Deterministic, stable-sorted by how many of the question's words fuzzy-match each example's words. */
+    private List<String> rankByCloseness(List<String> qWords, List<String> pool) {
+        List<String> sorted = new ArrayList<>(pool);
+        sorted.sort((a, b) -> Integer.compare(wordOverlap(qWords, b), wordOverlap(qWords, a)));
+        return sorted;
+    }
+
+    private int wordOverlap(List<String> qWords, String example) {
+        List<String> exWords = Normalizer.words(Normalizer.normalize(example));
+        int score = 0;
+        for (String qw : qWords) {
+            if (STOPWORDS.contains(qw)) continue;
+            for (String ew : exWords) {
+                if (STOPWORDS.contains(ew)) continue;
+                if (EditDistance.closeEnough(qw, ew)) {
+                    score++;
+                    break;
+                }
+            }
+        }
+        return score;
     }
 
     private QueryResult owners(String understood, int top) {

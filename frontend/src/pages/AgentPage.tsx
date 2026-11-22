@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Search, Send } from 'lucide-react';
 import { api, errMsg } from '../api';
+import { generateFollowUps } from '../agentFollowUps';
 import Badge from '../components/Badge';
 import Card from '../components/Card';
 import PageHeader from '../components/PageHeader';
@@ -136,10 +137,43 @@ export default function AgentPage({ initialQuestion, onConsumeInitialQuestion }:
               ))}
             </div>
           ) : (
-            result.columns.length > 0 && <ResultTable columns={result.columns} rows={result.rows} />
+            <>
+              {result.columns.length > 0 && <ResultTable columns={result.columns} rows={result.rows} />}
+              <FollowUpChips question={question} result={result} examples={examples} onPick={askExample} />
+            </>
           )}
         </Card>
       )}
+    </div>
+  );
+}
+
+interface FollowUpChipsProps {
+  question: string;
+  result: QueryResult;
+  examples: string[];
+  onPick: (q: string) => void;
+}
+
+/** Deterministic "related question" chips derived from the current answer - see agentFollowUps.ts. */
+function FollowUpChips({ question, result, examples, onPick }: FollowUpChipsProps) {
+  const followUps = generateFollowUps(question, result, examples);
+  if (followUps.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-3 dark:border-gray-800">
+      <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Related questions</span>
+      <div className="flex flex-wrap gap-2">
+        {followUps.map((q) => (
+          <button
+            key={q}
+            type="button"
+            onClick={() => onPick(q)}
+            className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

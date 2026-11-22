@@ -45,6 +45,11 @@ public class AgentRepository {
     private record Where(String sql, Map<String, Object> params) {
     }
 
+    /** Runs a {@link SqlBuilder.BuiltSql}: the fixed, parameterized SQL built by {@link SqlBuilder} for a {@link QuerySpec}. */
+    public Table run(SqlBuilder.BuiltSql built) {
+        return run(built.sql(), built.params());
+    }
+
     public List<String> genres(UUID scope) {
         return distinct("genre", scope);
     }
