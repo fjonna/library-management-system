@@ -105,17 +105,20 @@ public class AgentRepository {
         return run(sql, w.params());
     }
 
+    /** coalesce(...,0): avg() over zero priced books is SQL NULL, never surfaced to the caller. */
     public Table averagePrice(Filter f) {
         Where w = where(f);
-        return run("select round(avg(b.price), 2) as \"Average price\", count(b.price) as \"Priced books\""
+        return run("select coalesce(round(avg(b.price), 2), 0) as \"Average price\", count(b.price) as \"Priced books\""
             + " from books b join users u on u.id = b.user_id" + w.sql() + " and b.price is not null", w.params());
     }
 
     public Table topAuthor(Filter f, int limit) {
         Where w = where(f);
-        return run("select b.author as \"Author\", count(*) as \"Books\""
+        String sql = "select b.author as \"Author\", count(*) as \"Books\""
             + " from books b join users u on u.id = b.user_id" + w.sql()
-            + " group by b.author order by 2 desc, 1 limit :lim", w.params());
+            + " group by b.author order by 2 desc, 1 limit :lim";
+        w.params().put("lim", limit);
+        return run(sql, w.params());
     }
 
     public Table searchTitle(Filter f, boolean admin, String text, int limit) {

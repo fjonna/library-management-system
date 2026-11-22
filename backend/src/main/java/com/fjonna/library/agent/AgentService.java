@@ -127,8 +127,10 @@ public class AgentService {
             case AVERAGE_PRICE -> {
                 Table t = repo.averagePrice(f);
                 List<Object> r = t.rows().get(0);
-                yield result(p, understood, "Average price", t,
-                    "Average price " + where + ": " + r.get(0) + " across " + r.get(1) + " priced book(s)." + filters(p));
+                boolean noPricedBooks = ((Number) r.get(1)).longValue() == 0;
+                yield result(p, understood, "Average price", t, noPricedBooks
+                    ? "You don't have any books with a price yet." + filters(p)
+                    : "Average price " + where + ": " + r.get(0) + " across " + r.get(1) + " priced book(s)." + filters(p));
             }
             case TOP_AUTHOR -> {
                 Table t = repo.topAuthor(f, top);
