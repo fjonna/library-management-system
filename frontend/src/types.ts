@@ -43,6 +43,7 @@ export interface QueryResult {
   summary: string;
   columns: string[];
   rows: Cell[][];
+  suggestedQuestions: boolean;
 }
 
 export interface InsightStats {

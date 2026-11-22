@@ -4,6 +4,7 @@ import com.fjonna.library.agent.AgentRepository.Filter;
 import com.fjonna.library.agent.AgentRepository.Sort;
 import com.fjonna.library.agent.AgentRepository.Table;
 import com.fjonna.library.agent.QueryParser.Parsed;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -17,11 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentService {
 
     private static final int MAX_ROWS = 50;
+    private static final int MAX_EXAMPLES_USER = 6;
+    private static final int MAX_EXAMPLES_ADMIN = 8;
     private static final Random RANDOM = new Random();
 
-    public static final List<String> EXAMPLES = List.of(
-        "Who owns the most books?",
-        "Which is the most popular book?",
+    /** Safe for any user to ask: never ranks or lists other users. */
+    public static final List<String> COMMON_EXAMPLES = List.of(
         "Show the five most expensive books",
         "Show my cheapest 3 books",
         "How many books have I completed?",
@@ -34,14 +36,31 @@ public class AgentService {
         "Which author has the most books?",
         "Show my most recent books",
         "Find the book titled Dune",
-        "Kush ka më shumë libra?",
         "Cilat janë librat më të shtrenjtë?",
         "Sa libra kam?",
         "Librat më të fundit",
         "Kërko librin me titullin Dune");
 
+    /** Only shown to admins: these rank or list information about other users. */
+    public static final List<String> ADMIN_ONLY_EXAMPLES = List.of(
+        "Who owns the most books?",
+        "Which is the most popular book?",
+        "Kush ka më shumë libra?");
+
     private final QueryParser parser;
     private final AgentRepository repo;
+
+    /** Role-aware, shuffled subset for the "examples" endpoint and chip suggestions. */
+    public List<String> examples(boolean admin) {
+        return pickExamples(admin, admin ? MAX_EXAMPLES_ADMIN : MAX_EXAMPLES_USER);
+    }
+
+    private List<String> pickExamples(boolean admin, int max) {
+        List<String> pool = new ArrayList<>(COMMON_EXAMPLES);
+        if (admin) pool.addAll(ADMIN_ONLY_EXAMPLES);
+        Collections.shuffle(pool, RANDOM);
+        return pool.subList(0, Math.min(max, pool.size()));
+    }
 
     @Transactional(readOnly = true)
     public QueryResult answer(UUID userId, boolean admin, String question) {
@@ -54,7 +73,7 @@ public class AgentService {
         String understood = understoodAs(p, admin);
 
         return switch (p.intent()) {
-            case MOST_BOOKS_OWNER -> admin ? owners(understood, top) : adminOnly(understood);
+            case MOST_BOOKS_OWNER -> admin ? owners(understood, top) : adminOnly();
             case MOST_POPULAR_BOOK -> popular(understood, top);
             case TOP_EXPENSIVE -> {
                 Table t = repo.books(f, admin, Sort.PRICE_DESC, top);
@@ -130,12 +149,10 @@ public class AgentService {
                     : "Found " + t.rows().size() + " book(s) matching '" + p.searchText() + "' " + where + ".");
             }
             case UNKNOWN -> {
-                List<String> suggestions = new java.util.ArrayList<>(EXAMPLES);
-                Collections.shuffle(suggestions, RANDOM);
-                List<String> picked = suggestions.subList(0, Math.min(3, suggestions.size()));
+                List<String> picked = pickExamples(admin, 3);
                 yield new QueryResult(p.intent().name(), understood, "I did not understand that",
                     "Try one of these questions.", List.of("Example questions"),
-                    picked.stream().map(e -> List.<Object>of(e)).toList());
+                    picked.stream().map(e -> List.<Object>of(e)).toList(), true);
             }
         };
     }
@@ -146,7 +163,7 @@ public class AgentService {
             ? "There are no users yet."
             : t.rows().get(0).get(0) + " owns the most books (" + t.rows().get(0).get(1) + ").";
         return new QueryResult(Intent.MOST_BOOKS_OWNER.name(), understood, "Users with the most books",
-            summary, t.columns(), t.rows());
+            summary, t.columns(), t.rows(), false);
     }
 
     private QueryResult popular(String understood, int top) {
@@ -156,16 +173,19 @@ public class AgentService {
             : "The most popular book is '" + t.rows().get(0).get(0) + "' by " + t.rows().get(0).get(1)
                 + ", owned by " + t.rows().get(0).get(2) + " user(s).";
         return new QueryResult(Intent.MOST_POPULAR_BOOK.name(), understood, "Most popular books",
-            summary, t.columns(), t.rows());
+            summary, t.columns(), t.rows(), false);
     }
 
-    private QueryResult adminOnly(String understood) {
-        return new QueryResult(Intent.MOST_BOOKS_OWNER.name(), understood, "Admins only",
-            "Questions about other users are only available to admins.", List.of(), List.of());
+    /** A regular user asked a question that ranks/lists other users (admin-only). */
+    private QueryResult adminOnly() {
+        List<String> picked = pickExamples(false, 3);
+        return new QueryResult(Intent.MOST_BOOKS_OWNER.name(), "Question about other users", "Not available",
+            "This question is about other users, and only admins can see that. Try asking about your own books instead.",
+            List.of("Example questions"), picked.stream().map(e -> List.<Object>of(e)).toList(), true);
     }
 
     private QueryResult result(Parsed p, String understood, String title, Table t, String summary) {
-        return new QueryResult(p.intent().name(), understood, title, summary, t.columns(), t.rows());
+        return new QueryResult(p.intent().name(), understood, title, summary, t.columns(), t.rows(), false);
     }
 
     private String filters(Parsed p) {

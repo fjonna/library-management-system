@@ -130,6 +130,7 @@ export default function AdminPage() {
               <thead className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <tr className="border-b border-gray-200 dark:border-gray-800">
                   <th className="px-3 py-2 font-medium">Username</th>
+                  <th className="px-3 py-2 font-medium">User ID</th>
                   <th className="px-3 py-2 font-medium">Email</th>
                   <th className="px-3 py-2 font-medium">Books</th>
                   <th className="px-3 py-2" />
@@ -141,6 +142,9 @@ export default function AdminPage() {
                   return (
                     <tr key={u.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40">
                       <td className="px-3 py-2.5 font-medium">{u.username}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-gray-400 dark:text-gray-500" title={u.id}>
+                        {u.id.slice(0, 8)}
+                      </td>
                       <td
                         className="max-w-[220px] truncate px-3 py-2.5 text-gray-600 dark:text-gray-300"
                         title={u.email}
@@ -198,18 +202,24 @@ export default function AdminPage() {
             <table className="w-full text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <tr className="border-b border-gray-200 dark:border-gray-800">
+                  <th className="px-3 py-2 font-medium">Owner</th>
                   <th className="px-3 py-2 font-medium">Title</th>
                   <th className="px-3 py-2 font-medium">Author</th>
                   <th className="px-3 py-2 font-medium">Genre</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Price</th>
-                  <th className="px-3 py-2 font-medium">Owner</th>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {shownBooks.map((b) => (
                   <tr key={b.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{b.ownerUsername}</div>
+                      <div className="font-mono text-xs text-gray-400 dark:text-gray-500" title={b.ownerId}>
+                        {b.ownerId.slice(0, 8)}
+                      </div>
+                    </td>
                     <td className="max-w-[200px] truncate px-3 py-2.5 font-medium" title={b.title}>
                       {b.title}
                     </td>
@@ -224,7 +234,6 @@ export default function AdminPage() {
                       <StatusBadge status={b.status} />
                     </td>
                     <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{formatPrice(b.price)}</td>
-                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{b.ownerUsername}</td>
                     <td className="px-3 py-2.5">
                       <div className="flex justify-end">
                         <button

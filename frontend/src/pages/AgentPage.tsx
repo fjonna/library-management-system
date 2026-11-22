@@ -122,7 +122,7 @@ export default function AgentPage({ initialQuestion, onConsumeInitialQuestion }:
           <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-200">
             {result.summary}
           </p>
-          {result.intent === 'UNKNOWN' ? (
+          {result.suggestedQuestions ? (
             <div className="flex flex-wrap gap-2">
               {result.rows.map((row) => (
                 <button

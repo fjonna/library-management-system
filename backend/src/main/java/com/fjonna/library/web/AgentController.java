@@ -27,13 +27,17 @@ public class AgentController {
     @PostMapping("/query")
     public QueryResult query(@AuthenticationPrincipal Jwt jwt, Authentication auth,
                              @Valid @RequestBody QueryRequest request) {
-        boolean admin = auth.getAuthorities().stream()
-            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean admin = isAdmin(auth);
         return agentService.answer(UUID.fromString(jwt.getSubject()), admin, request.question());
     }
 
+    /** A role-aware, shuffled subset: max 6 for USER, max 8 for ADMIN. Never ranks other users for USER. */
     @GetMapping("/examples")
-    public List<String> examples() {
-        return AgentService.EXAMPLES;
+    public List<String> examples(Authentication auth) {
+        return agentService.examples(isAdmin(auth));
+    }
+
+    private boolean isAdmin(Authentication auth) {
+        return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
     }
 }

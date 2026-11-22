@@ -227,6 +227,9 @@ body::after {
   padding: 32px !important;
   padding-inline: 32px !important;
   padding-block: 32px !important;
+  /* base text size/line-height for everything inside the card */
+  font-size: 1rem !important;
+  line-height: 1.4 !important;
   /* frosted glass */
   background: var(--library-card-bg) !important;
   border: 1px solid var(--library-card-border) !important;
@@ -263,7 +266,6 @@ body::after {
   color: var(--library-text) !important;
   font-weight: 700 !important;
   font-size: 1.5rem !important;
-  line-height: 1.3 !important;
   white-space: normal;
 }
 
@@ -351,8 +353,8 @@ body::after {
 
 .pf-v5-c-form__label-text {
   color: var(--library-muted) !important;
-  font-weight: 500 !important;
-  font-size: 0.85rem;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
 }
 
 /* ===== 9. span.pf-v5-c-form-control — the visible input pill (44px) ===== */
@@ -385,7 +387,7 @@ body::after {
   padding: 0 !important;
   margin: 0;
   color: var(--library-text);
-  font-size: 0.95rem;
+  font-size: 1rem !important;
   line-height: normal;
 }
 
@@ -476,16 +478,18 @@ input[aria-invalid="true"] {
 
 .pf-v5-c-check__label {
   color: var(--library-muted) !important;
-  font-size: 0.875rem;
+  font-size: 0.95rem !important;
 }
 
 /* ===== primary button ===== */
 
 .pf-v5-c-button.pf-m-primary {
   width: 100%;
+  height: 44px !important;
   background: var(--library-accent) !important;
   border-color: var(--library-accent) !important;
   border-radius: 10px !important;
+  font-size: 1.05rem !important;
   font-weight: 600 !important;
   transition: background-color 0.15s ease-in-out;
 }
@@ -535,7 +539,21 @@ input[aria-invalid="true"] {
 #kc-registration,
 #kc-registration span {
   color: var(--library-muted);
-  font-size: 0.875rem;
+  font-size: 0.95rem !important;
+}
+
+/* "Back to Login" (register page) and "* Required fields" (register page) —
+   same 0.95rem as the other links/helper text, on every screen size */
+.pf-v5-c-login__main-footer-band,
+.subtitle {
+  font-size: 0.95rem !important;
+}
+
+/* error message text (e.g. "Invalid username or password", field validation) */
+.pf-v5-c-alert,
+.pf-v5-c-helper-text__item-text,
+.kc-feedback-text {
+  font-size: 0.95rem !important;
 }
 
 #kc-registration a {
@@ -555,4 +573,122 @@ input[aria-invalid="true"] {
   max-width: none !important;
   border-radius: 10px !important;
   margin-bottom: 1.25rem !important;
+}
+
+/* ============================================================================
+ * Desktop-only refinements (laptop screens, e.g. 1366x768 / 1920x1080).
+ * Everything in this project lives inside this single media query so the
+ * phone layout above is completely untouched.
+ *
+ * Register page is a SINGLE column, same as login — no display:grid /
+ * grid-template-columns / grid-column overrides here (a two-column layout
+ * was tried and reverted). .pf-v5-c-form already has
+ * "display:grid; gap:0 !important;" set above (unscoped, applies at every
+ * width) specifically so PatternFly's own grid gap never stacks on top of
+ * .pf-v5-c-form__group's own margin-bottom — that mechanism is unchanged;
+ * only the margin-bottom *value* is tightened below for desktop.
+ * ============================================================================ */
+@media (min-width: 900px) {
+  /* 1. card size */
+  .pf-v5-c-login__main {
+    width: min(560px, calc(100% - 48px)) !important;
+    padding: 28px 40px !important;
+    padding-inline: 40px !important;
+    padding-block: 28px !important;
+  }
+
+  /* 2. compact vertical spacing throughout (login and register alike) */
+  .pf-v5-c-login__main-header h1,
+  #kc-page-title {
+    font-size: 1.75rem !important;
+  }
+
+  .pf-v5-c-form__group {
+    margin-bottom: 10px !important;
+  }
+
+  .pf-v5-c-form__group:has(.pf-v5-c-helper-text) {
+    margin-bottom: 10px !important;
+  }
+
+  .pf-v5-c-form-control,
+  .pf-v5-c-input-group {
+    height: 42px !important;
+  }
+
+  /* compact "* Required fields" note (register page only; no-op elsewhere
+     since .subtitle / .pf-v5-u-mb-md-on-md only exist in that markup) */
+  .pf-v5-u-mb-md-on-md {
+    margin-bottom: 8px !important;
+  }
+
+  .subtitle {
+    margin: 0 !important;
+  }
+}
+
+/* ============================================================================
+ * Register page ONLY, desktop ONLY: a noticeably shorter card so Username,
+ * Password, Confirm password, Email, First name and Last name all fit at
+ * 1366x768 without scrolling. Scoped with body[data-page-id="login-register"]
+ * — a real attribute confirmed from the live DOM (the sign-in page's body
+ * has data-page-id="login-login" instead) — so the Sign in page keeps
+ * exactly the spacing set in the block above.
+ * ============================================================================ */
+@media (min-width: 900px) {
+  body[data-page-id="login-register"] .pf-v5-c-login__main {
+    padding: 20px 36px !important;
+    padding-inline: 36px !important;
+    padding-block: 20px !important;
+  }
+
+  body[data-page-id="login-register"] .pf-v5-c-login__main-header {
+    margin-bottom: 4px !important;
+  }
+
+  /* "* Required fields" note on one small, tight line (font-size now comes
+     from the universal .subtitle rule above; only margin is tightened here) */
+  body[data-page-id="login-register"] .pf-v5-u-mb-md-on-md {
+    margin: 0 !important;
+  }
+
+  body[data-page-id="login-register"] .subtitle {
+    margin: 0 0 6px 0 !important;
+  }
+
+  /* form groups */
+  body[data-page-id="login-register"] .pf-v5-c-form__group {
+    margin-bottom: 6px !important;
+  }
+
+  body[data-page-id="login-register"] .pf-v5-c-form__group-label {
+    margin-bottom: 2px !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* these helper-text placeholders render even when empty (register has no
+     "remember me" to put in them) — they only ever hold a live-region, so
+     the margin they'd otherwise add is pure empty space */
+  body[data-page-id="login-register"] .pf-v5-c-form__helper-text {
+    margin-top: 0 !important;
+  }
+
+  body[data-page-id="login-register"] [id^="input-error-container-"] {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* submit button: height/font-size now come from the universal
+     .pf-v5-c-button.pf-m-primary rule above; only the tighter gap above it
+     is register-specific */
+  body[data-page-id="login-register"] .pf-v5-c-button.pf-m-primary {
+    margin-top: 10px !important;
+  }
+
+  /* "Back to Login": close below the button (font-size now comes from the
+     universal .pf-v5-c-login__main-footer-band rule above; border/padding
+     already zeroed by the unscoped version of that same selector) */
+  body[data-page-id="login-register"] .pf-v5-c-login__main-footer-band {
+    margin-top: 8px !important;
+  }
 }
