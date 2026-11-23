@@ -3,7 +3,6 @@ import type { FormEvent } from 'react';
 import { Search, Send } from 'lucide-react';
 import { api, errMsg } from '../api';
 import { generateFollowUps } from '../agentFollowUps';
-import Badge from '../components/Badge';
 import Card from '../components/Card';
 import PageHeader from '../components/PageHeader';
 import ResultTable from '../components/ResultTable';
@@ -114,11 +113,6 @@ export default function AgentPage({ initialQuestion, onConsumeInitialQuestion }:
 
       {result && (
         <Card className="flex flex-col gap-3">
-          {result.understoodAs && (
-            <Badge color="indigo" className="self-start">
-              {result.understoodAs}
-            </Badge>
-          )}
           <h2 className="text-lg font-semibold">{result.title}</h2>
           <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-200">
             {result.summary}
@@ -138,7 +132,9 @@ export default function AgentPage({ initialQuestion, onConsumeInitialQuestion }:
             </div>
           ) : (
             <>
-              {result.columns.length > 0 && <ResultTable columns={result.columns} rows={result.rows} />}
+              {/* The summary sentence above already says when there's nothing to show -
+                  never render a table with headers but no rows. */}
+              {result.rows.length > 0 && <ResultTable columns={result.columns} rows={result.rows} />}
               <FollowUpChips question={question} result={result} examples={examples} onPick={askExample} />
             </>
           )}

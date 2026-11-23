@@ -3,11 +3,14 @@ package com.fjonna.library.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fjonna.library.agent.AgentRepository.Sort;
 import com.fjonna.library.agent.AgentRepository.Table;
 import com.fjonna.library.agent.QueryParser.Parsed;
+import com.fjonna.library.book.BookStatus;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +27,13 @@ class AgentServiceTest {
     private void stubParse(Intent intent) {
         when(parser.parse(any(), any(), any()))
             .thenReturn(new Parsed(intent, null, null, null, null, null, null));
+        when(repo.genres(any())).thenReturn(List.of());
+        when(repo.authors(any())).thenReturn(List.of());
+    }
+
+    private void stubParseWithStatus(Intent intent, BookStatus status) {
+        when(parser.parse(any(), any(), any()))
+            .thenReturn(new Parsed(intent, null, null, null, status, null, null));
         when(repo.genres(any())).thenReturn(List.of());
         when(repo.authors(any())).thenReturn(List.of());
     }
@@ -49,7 +59,7 @@ class AgentServiceTest {
         QueryResult result = service.answer(uid, false, "What is the average price of my books?");
 
         assertThat(result.summary()).doesNotContainIgnoringCase("null");
-        assertThat(result.summary()).contains("12.50").contains("2 priced book(s)");
+        assertThat(result.summary()).contains("12.50").contains("2 priced books");
     }
 
     @Test
@@ -60,7 +70,39 @@ class AgentServiceTest {
         QueryResult result = service.answer(uid, false, "Which author has the most books?");
 
         assertThat(result.summary()).doesNotContainIgnoringCase("null");
-        assertThat(result.summary()).contains("No books found");
+        assertThat(result.summary()).contains("don't have any books");
+    }
+
+    @Test
+    void countBooksWithCompletedStatusAndNoneYetReadsNaturallyInEnglish() {
+        stubParseWithStatus(Intent.COUNT_BOOKS, BookStatus.COMPLETED);
+        when(repo.count(any())).thenReturn(new Table(List.of("Books"), List.of(List.of(0L))));
+
+        QueryResult result = service.answer(uid, false, "How many books have I completed?");
+
+        assertThat(result.summary()).isEqualTo("You have 0 completed books.");
+        assertThat(result.summary()).doesNotContain("Filters").doesNotContain("COMPLETED").doesNotContain("status=");
+    }
+
+    @Test
+    void countBooksWithCompletedStatusAndNoneYetReadsNaturallyInAlbanian() {
+        stubParseWithStatus(Intent.COUNT_BOOKS, BookStatus.COMPLETED);
+        when(repo.count(any())).thenReturn(new Table(List.of("Books"), List.of(List.of(0L))));
+
+        QueryResult result = service.answer(uid, false, "Sa libra kam përfunduar?");
+
+        assertThat(result.summary()).isEqualTo("Nuk ke asnjë libër të përfunduar.");
+    }
+
+    @Test
+    void topExpensiveBooksAreShownBelowInsteadOfNarratingOneRow() {
+        stubParse(Intent.TOP_EXPENSIVE);
+        when(repo.books(any(), eq(false), eq(Sort.PRICE_DESC), anyInt()))
+            .thenReturn(new Table(List.of("Title"), List.of(List.of("Dune"), List.of("Foo"))));
+
+        QueryResult result = service.answer(uid, false, "Show the five most expensive books");
+
+        assertThat(result.summary()).isEqualTo("Your 2 most expensive books are shown below.");
     }
 
     /** The legacy parser cannot express "sum of pages per user" as an Intent, so it reports UNKNOWN. */

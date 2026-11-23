@@ -4,6 +4,7 @@ import com.fjonna.library.agent.AgentRepository.Filter;
 import com.fjonna.library.agent.AgentRepository.Sort;
 import com.fjonna.library.agent.AgentRepository.Table;
 import com.fjonna.library.agent.QueryParser.Parsed;
+import com.fjonna.library.book.BookStatus;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -83,7 +84,7 @@ public class AgentService {
         Filter f = new Filter(scope, p.genre(), p.author(), p.status());
         int limit = p.limit() == null ? 0 : Math.min(Math.max(p.limit(), 1), MAX_ROWS);
         int top = limit == 0 ? 5 : limit;
-        String where = admin ? "in the whole library" : "in your library";
+        boolean albanian = Vocabulary.isAlbanian(question);
         String understood = understoodAs(p, admin);
 
         return switch (p.intent()) {
@@ -91,80 +92,69 @@ public class AgentService {
             case MOST_POPULAR_BOOK -> popular(understood, top);
             case TOP_EXPENSIVE -> {
                 Table t = repo.books(f, admin, Sort.PRICE_DESC, top);
-                yield result(p, understood, "Most expensive books", t, t.rows().isEmpty()
-                    ? "No priced books found " + where + "."
-                    : "The most expensive book " + where + " is '" + t.rows().get(0).get(1)
-                        + "' at " + t.rows().get(0).get(5) + "." + filters(p));
+                yield result(p, understood, "Most expensive books", t,
+                    rankedListSentence(t, p, admin, albanian, "most expensive", "më të shtrenjtë",
+                        "priced books", "libra me çmim"));
             }
             case CHEAPEST -> {
                 Table t = repo.books(f, admin, Sort.PRICE_ASC, top);
-                yield result(p, understood, "Cheapest books", t, t.rows().isEmpty()
-                    ? "No priced books found " + where + "."
-                    : "The cheapest book " + where + " is '" + t.rows().get(0).get(1)
-                        + "' at " + t.rows().get(0).get(5) + "." + filters(p));
+                yield result(p, understood, "Cheapest books", t,
+                    rankedListSentence(t, p, admin, albanian, "cheapest", "më të lirë",
+                        "priced books", "libra me çmim"));
             }
             case LONGEST -> {
                 Table t = repo.books(f, admin, Sort.PAGES_DESC, top);
-                yield result(p, understood, "Longest books", t, t.rows().isEmpty()
-                    ? "No books with page counts found " + where + "."
-                    : "The longest book " + where + " is '" + t.rows().get(0).get(1)
-                        + "' with " + t.rows().get(0).get(6) + " pages." + filters(p));
+                yield result(p, understood, "Longest books", t,
+                    rankedListSentence(t, p, admin, albanian, "longest", "më të gjatë",
+                        "books with a page count", "libra me numër faqesh"));
+            }
+            case RECENT_BOOKS -> {
+                Table t = repo.books(f, admin, Sort.NEWEST, top);
+                yield result(p, understood, "Most recent books", t,
+                    rankedListSentence(t, p, admin, albanian, "most recent", "më të fundit",
+                        "books", "libra"));
             }
             case TOTAL_VALUE -> {
                 Table t = repo.totalValue(f);
                 List<Object> r = t.rows().get(0);
-                yield result(p, understood, "Total value", t,
-                    "Total value " + where + ": " + r.get(0) + " across " + r.get(1) + " book(s)." + filters(p));
+                yield result(p, understood, "Total value", t, totalValueSentence(
+                    r.get(0), ((Number) r.get(1)).longValue(), p, admin, albanian));
             }
             case COUNT_BOOKS -> {
                 Table t = repo.count(f);
-                yield result(p, understood, "Book count", t,
-                    ((Number) t.rows().get(0).get(0)).longValue() + " book(s) " + where + "." + filters(p));
+                long count = ((Number) t.rows().get(0).get(0)).longValue();
+                yield result(p, understood, "Book count", t, countSentence(count, p, admin, albanian));
             }
             case GENRE_BREAKDOWN -> {
                 Table t = repo.genreBreakdown(f);
-                yield result(p, understood, "Books per genre", t,
-                    t.rows().size() + " genre(s) " + where + "." + filters(p));
+                yield result(p, understood, "Books per genre", t, genreBreakdownSentence(t, p, admin, albanian));
             }
             case LIST_BOOKS -> {
                 Table t = repo.books(f, admin, Sort.NEWEST, limit == 0 ? MAX_ROWS : limit);
-                yield result(p, understood, "Books", t, t.rows().isEmpty()
-                    ? "No books matched " + where + "." + filters(p)
-                    : "Found " + t.rows().size() + " book(s) " + where + "." + filters(p));
+                yield result(p, understood, "Books", t,
+                    rankedListSentence(t, p, admin, albanian, null, null, "books", "libra"));
             }
             case BOOKS_UNDER_PRICE -> {
                 Table t = repo.booksUnderPrice(f, admin, p.price(), MAX_ROWS);
-                yield result(p, understood, "Books under " + p.price(), t, t.rows().isEmpty()
-                    ? "No books priced at or under " + p.price() + " found " + where + "." + filters(p)
-                    : "Found " + t.rows().size() + " book(s) at or under " + p.price() + " " + where + "." + filters(p));
+                yield result(p, understood, "Books under " + p.price(), t,
+                    booksUnderPriceSentence(t, p, admin, albanian));
             }
             case AVERAGE_PRICE -> {
                 Table t = repo.averagePrice(f);
                 List<Object> r = t.rows().get(0);
                 boolean noPricedBooks = ((Number) r.get(1)).longValue() == 0;
-                yield result(p, understood, "Average price", t, noPricedBooks
-                    ? "You don't have any books with a price yet." + filters(p)
-                    : "Average price " + where + ": " + r.get(0) + " across " + r.get(1) + " priced book(s)." + filters(p));
+                yield result(p, understood, "Average price", t,
+                    averagePriceSentence(r.get(0), ((Number) r.get(1)).longValue(), noPricedBooks, p, admin, albanian));
             }
             case TOP_AUTHOR -> {
                 Table t = repo.topAuthor(f, top);
-                yield result(p, understood, "Author with the most books", t, t.rows().isEmpty()
-                    ? "No books found " + where + "."
-                    : t.rows().get(0).get(0) + " has the most books " + where + " (" + t.rows().get(0).get(1) + ")." + filters(p));
-            }
-            case RECENT_BOOKS -> {
-                Table t = repo.books(f, admin, Sort.NEWEST, top);
-                yield result(p, understood, "Most recent books", t, t.rows().isEmpty()
-                    ? "No books found " + where + "."
-                    : "Found " + t.rows().size() + " recent book(s) " + where + "." + filters(p));
+                yield result(p, understood, "Author with the most books", t, topAuthorSentence(t, p, admin, albanian));
             }
             case SEARCH_TITLE -> {
                 Table t = repo.searchTitle(f, admin, p.searchText(), MAX_ROWS);
-                yield result(p, understood, "Search results", t, t.rows().isEmpty()
-                    ? "No books with a title matching '" + p.searchText() + "' found " + where + "."
-                    : "Found " + t.rows().size() + " book(s) matching '" + p.searchText() + "' " + where + ".");
+                yield result(p, understood, "Search results", t, searchTitleSentence(t, p, admin, albanian));
             }
-            case UNKNOWN -> handleUnknown(question, genres, authors, scope, admin);
+            case UNKNOWN -> handleUnknown(question, genres, authors, scope, admin, albanian);
         };
     }
 
@@ -173,7 +163,7 @@ public class AgentService {
      * filter/groupBy combination {@link SpecParser} can recognize) before giving up for good.
      */
     private QueryResult handleUnknown(String question, List<String> genres, List<String> authors,
-                                       UUID scope, boolean admin) {
+                                       UUID scope, boolean admin, boolean albanian) {
         QuerySpec spec = parser.toSpec(question, genres, authors);
         if (specHelper.isEmpty(spec)) {
             return unknownResult(admin, question);
@@ -182,25 +172,25 @@ public class AgentService {
             return adminOnly();
         }
         Table t = repo.run(sqlBuilder.build(spec, scope, admin));
-        return genericResult(spec, admin, t);
+        return genericResult(spec, admin, albanian, t);
     }
 
-    private QueryResult genericResult(QuerySpec spec, boolean admin, Table t) {
+    private QueryResult genericResult(QuerySpec spec, boolean admin, boolean albanian, Table t) {
         String understood = summaryFormatter.understoodAs(spec, admin);
         String title = summaryFormatter.title(spec);
         String label = "QUERY_" + spec.aggregate()
             + (spec.field() != null ? "_" + spec.field() : "")
             + (spec.groupBy() != null ? "_BY_" + spec.groupBy() : "");
         String summary = spec.groupBy() != null
-            ? summaryFormatter.groupSummary(spec, admin, t)
+            ? summaryFormatter.groupSummary(spec, admin, albanian, t)
             : switch (spec.aggregate()) {
                 case SUM, AVG, MIN, MAX -> {
                     List<Object> row = t.rows().get(0);
-                    yield summaryFormatter.scalarSummary(spec, admin, row.get(0), ((Number) row.get(1)).longValue());
+                    yield summaryFormatter.scalarSummary(spec, admin, albanian, row.get(0), ((Number) row.get(1)).longValue());
                 }
-                case COUNT -> summaryFormatter.countSummary(spec, admin, ((Number) t.rows().get(0).get(0)).longValue());
-                case LIST -> summaryFormatter.listSummary(spec, admin, t);
-                case GROUP_COUNT -> summaryFormatter.groupSummary(spec, admin, t);
+                case COUNT -> summaryFormatter.countSummary(spec, admin, albanian, ((Number) t.rows().get(0).get(0)).longValue());
+                case LIST -> summaryFormatter.listSummary(spec, admin, albanian, t);
+                case GROUP_COUNT -> summaryFormatter.groupSummary(spec, admin, albanian, t);
             };
         return new QueryResult(label, understood, title, summary, t.columns(), t.rows(), false);
     }
@@ -274,15 +264,203 @@ public class AgentService {
         return new QueryResult(p.intent().name(), understood, title, summary, t.columns(), t.rows(), false);
     }
 
-    private String filters(Parsed p) {
-        StringBuilder sb = new StringBuilder();
-        if (p.genre() != null) sb.append(" genre=").append(p.genre());
-        if (p.author() != null) sb.append(" author=").append(p.author());
-        if (p.status() != null) sb.append(" status=").append(p.status());
-        return sb.isEmpty() ? "" : " Filters:" + sb + ".";
+    // ==================================================================================
+    // Human-readable summary sentences. Filters are woven in as plain language (never
+    // "status=COMPLETED"/"genre=X"), in English or Albanian depending on `albanian`
+    // (see Vocabulary#isAlbanian). understoodAs() below is the one exception: it stays
+    // in its original key=value shape because the frontend parses it (never displays it)
+    // to build follow-up question chips.
+    // ==================================================================================
+
+    /** English trailing filter words, in reading order: status (unless COMPLETED, see {@link #enPrefix}), genre, author. */
+    private List<String> enTrailingParts(Parsed p) {
+        List<String> parts = new ArrayList<>();
+        if (p.status() == BookStatus.READING) parts.add("currently reading");
+        if (p.status() == BookStatus.TO_READ) parts.add("to read");
+        if (p.genre() != null) parts.add("in " + SummaryFormatter.capitalize(p.genre()));
+        if (p.author() != null) parts.add("by " + SummaryFormatter.titleCase(p.author()));
+        return parts;
     }
 
-    /** Short readable sentence describing how the question was interpreted. */
+    /** "completed " when that's the status filter (reads better before the noun), else "". */
+    private String enPrefix(Parsed p) {
+        return p.status() == BookStatus.COMPLETED ? "completed " : "";
+    }
+
+    /** Albanian trailing filter words: status, genre, author - Albanian adjectives follow the noun. */
+    private List<String> alTrailingParts(Parsed p, boolean singularStatus) {
+        List<String> parts = new ArrayList<>();
+        if (p.status() != null) {
+            String label = SummaryFormatter.statusLabel(p.status(), true);
+            parts.add(singularStatus && label.endsWith("a") ? label.substring(0, label.length() - 1) : label);
+        }
+        if (p.genre() != null) parts.add("nga zhanri " + SummaryFormatter.capitalize(p.genre()));
+        if (p.author() != null) parts.add("nga " + SummaryFormatter.titleCase(p.author()));
+        return parts;
+    }
+
+    private String countSentence(long count, Parsed p, boolean admin, boolean albanian) {
+        if (albanian) {
+            if (count == 0) {
+                String phrase = String.join(" dhe ", alTrailingParts(p, true));
+                String suffix = phrase.isEmpty() ? "" : " " + phrase;
+                return admin ? "Nuk ka asnjë libër" + suffix + " në bibliotekë." : "Nuk ke asnjë libër" + suffix + ".";
+            }
+            String phrase = String.join(" dhe ", alTrailingParts(p, false));
+            String noun = count == 1 ? "libër" : "libra";
+            String base = (admin ? "Ka " : "Ke ") + count + " " + noun + (phrase.isEmpty() ? "" : " " + phrase);
+            return admin ? base + " në bibliotekë." : base + ".";
+        }
+        String prefix = enPrefix(p);
+        List<String> trailing = enTrailingParts(p);
+        if (count == 0 && prefix.isEmpty() && trailing.isEmpty()) {
+            return admin ? "There are no books in the library yet." : "You don't have any books yet.";
+        }
+        String trailingPhrase = trailing.isEmpty() ? "" : " " + String.join(" and ", trailing);
+        String noun = count == 1 ? "book" : "books";
+        return admin
+            ? "There are " + count + " " + prefix + noun + trailingPhrase + " in the library."
+            : "You have " + count + " " + prefix + noun + trailingPhrase + ".";
+    }
+
+    /** Shared by TOP_EXPENSIVE/CHEAPEST/LONGEST/RECENT_BOOKS/LIST_BOOKS: narrate the table, not one row of it. */
+    private String rankedListSentence(Table t, Parsed p, boolean admin, boolean albanian,
+                                       String enAdjective, String alAdjective, String emptyNounEn, String emptyNounAl) {
+        if (t.rows().isEmpty()) {
+            if (albanian) {
+                String phrase = String.join(" dhe ", alTrailingParts(p, true));
+                String noun = phrase.isEmpty() ? emptyNounAl : emptyNounAl + " " + phrase;
+                return admin ? "Nuk ka " + noun + " në bibliotekë." : "Nuk ke " + noun + ".";
+            }
+            List<String> trailing = enTrailingParts(p);
+            String prefix = enPrefix(p);
+            String noun = (prefix + emptyNounEn).trim();
+            if (!trailing.isEmpty()) noun = noun + " " + String.join(" and ", trailing);
+            return admin ? "There are no " + noun + " in the library yet." : "You don't have any " + noun + " yet.";
+        }
+        int count = t.rows().size();
+        if (albanian) {
+            String phrase = String.join(" dhe ", alTrailingParts(p, false));
+            String noun = count == 1 ? "libri" : "librat";
+            String adjPart = alAdjective == null ? "" : " " + alAdjective;
+            String scope = admin ? " në bibliotekë" : " e tu";
+            String filterPart = phrase.isEmpty() ? "" : " " + phrase;
+            return count + " " + noun + adjPart + scope + filterPart + " janë më poshtë.";
+        }
+        String prefix = enPrefix(p);
+        List<String> trailing = enTrailingParts(p);
+        String trailingPhrase = trailing.isEmpty() ? "" : " " + String.join(" and ", trailing);
+        String noun = count == 1 ? "book" : "books";
+        String adjPart = enAdjective == null ? "" : " " + enAdjective;
+        String who = admin ? "The" : "Your";
+        String where = admin ? " in the library" : "";
+        return who + " " + count + adjPart + " " + prefix + noun + trailingPhrase + where + " are shown below.";
+    }
+
+    private String totalValueSentence(Object total, long count, Parsed p, boolean admin, boolean albanian) {
+        if (albanian) {
+            String phrase = String.join(" dhe ", alTrailingParts(p, count == 0));
+            String suffix = phrase.isEmpty() ? "" : " " + phrase;
+            if (count == 0) {
+                return admin ? "Nuk ka asnjë libër" + suffix + " në bibliotekë." : "Nuk ke asnjë libër" + suffix + ".";
+            }
+            String scope = admin ? "në bibliotekë" : "librat e tu";
+            return "Vlera totale e " + scope + suffix + ": " + total + " nga " + SummaryFormatter.pluralizeAl(count, "libër", "libra") + ".";
+        }
+        String prefix = enPrefix(p);
+        List<String> trailing = enTrailingParts(p);
+        String trailingPhrase = trailing.isEmpty() ? "" : " " + String.join(" and ", trailing);
+        if (count == 0) {
+            return admin
+                ? "There are no " + prefix + "books" + trailingPhrase + " in the library yet."
+                : "You don't have any " + prefix + "books" + trailingPhrase + " yet.";
+        }
+        String where = admin ? "in the whole library" : "in your library";
+        return "Total value " + where + trailingPhrase + ": " + total + " across " + SummaryFormatter.pluralize(count, "book") + ".";
+    }
+
+    private String genreBreakdownSentence(Table t, Parsed p, boolean admin, boolean albanian) {
+        int count = t.rows().size();
+        if (albanian) {
+            String phrase = String.join(" dhe ", alTrailingParts(p, count == 0));
+            if (count == 0) {
+                String suffix = phrase.isEmpty() ? "" : " " + phrase;
+                return admin ? "Nuk ka asnjë libër" + suffix + " në bibliotekë." : "Nuk ke asnjë libër" + suffix + ".";
+            }
+            String scope = admin ? "në bibliotekë" : "te librat e tu";
+            String suffix = phrase.isEmpty() ? "" : " " + phrase;
+            return "Ka " + SummaryFormatter.pluralizeAl(count, "zhanër", "zhanre") + suffix + " " + scope + ".";
+        }
+        List<String> trailing = enTrailingParts(p);
+        String trailingPhrase = trailing.isEmpty() ? "" : " " + String.join(" and ", trailing);
+        if (count == 0) {
+            return admin ? "There are no books in the library yet." : "You don't have any books yet.";
+        }
+        String where = admin ? "in the whole library" : "in your library";
+        return SummaryFormatter.pluralize(count, "genre") + " " + where + trailingPhrase + ".";
+    }
+
+    private String booksUnderPriceSentence(Table t, Parsed p, boolean admin, boolean albanian) {
+        int count = t.rows().size();
+        if (albanian) {
+            if (count == 0) {
+                return admin
+                    ? "Nuk ka libra me çmim deri në $" + p.price() + " në bibliotekë."
+                    : "Nuk ke libra me çmim deri në $" + p.price() + ".";
+            }
+            String scope = admin ? "në bibliotekë" : "që ke";
+            return SummaryFormatter.pluralizeAl(count, "libër", "libra") + " me çmim deri në $" + p.price() + " " + scope + ".";
+        }
+        String where = admin ? "in the whole library" : "in your library";
+        if (count == 0) {
+            return "No books priced at or under $" + p.price() + " found " + where + ".";
+        }
+        return "Found " + SummaryFormatter.pluralize(count, "book") + " priced at or under $" + p.price() + " " + where + ".";
+    }
+
+    private String averagePriceSentence(Object average, long count, boolean noPricedBooks, Parsed p, boolean admin, boolean albanian) {
+        if (albanian) {
+            if (noPricedBooks) return admin ? "Ende nuk ka libra me çmim në bibliotekë." : "Ende nuk ke asnjë libër me çmim.";
+            String scope = admin ? "në bibliotekë" : "e librave të tu";
+            return "Çmimi mesatar " + scope + ": " + average + " nga " + SummaryFormatter.pluralizeAl(count, "libër", "libra") + " me çmim.";
+        }
+        if (noPricedBooks) return "You don't have any books with a price yet.";
+        String where = admin ? "in the whole library" : "in your library";
+        return "Average price " + where + ": " + average + " across " + SummaryFormatter.pluralize(count, "priced book") + ".";
+    }
+
+    private String topAuthorSentence(Table t, Parsed p, boolean admin, boolean albanian) {
+        if (t.rows().isEmpty()) {
+            if (albanian) return admin ? "Nuk ka ende libra në bibliotekë." : "Nuk ke ende asnjë libër.";
+            return admin ? "There are no books in the library yet." : "You don't have any books yet.";
+        }
+        Object author = t.rows().get(0).get(0);
+        Object count = t.rows().get(0).get(1);
+        if (albanian) {
+            String scope = admin ? "në bibliotekë" : "te librat e tu";
+            return author + " ka më shumë libra " + scope + " (" + count + ").";
+        }
+        String where = admin ? "in the whole library" : "in your library";
+        return author + " has the most books " + where + " (" + count + ").";
+    }
+
+    private String searchTitleSentence(Table t, Parsed p, boolean admin, boolean albanian) {
+        if (albanian) {
+            String scope = admin ? "në bibliotekë" : "te librat e tu";
+            return t.rows().isEmpty()
+                ? "Nuk u gjet asnjë libër me titull që përmban \"" + p.searchText() + "\" " + scope + "."
+                : SummaryFormatter.pluralizeAl(t.rows().size(), "libër", "libra") + " me titull që përmban \""
+                    + p.searchText() + "\" " + scope + ".";
+        }
+        String where = admin ? "in the whole library" : "in your library";
+        return t.rows().isEmpty()
+            ? "No books with a title matching '" + p.searchText() + "' found " + where + "."
+            : "Found " + SummaryFormatter.pluralize(t.rows().size(), "book") + " matching '" + p.searchText() + "' " + where + ".";
+    }
+
+    /** Short readable sentence describing how the question was interpreted. Part of the API contract:
+     *  the frontend parses this for "genre="/"author="/"status=" to build follow-up chips, so its
+     *  key=value shape must not change - it is never shown to the user. */
     private String understoodAs(Parsed p, boolean admin) {
         String sentence = switch (p.intent()) {
             case MOST_BOOKS_OWNER -> "Who owns the most books";

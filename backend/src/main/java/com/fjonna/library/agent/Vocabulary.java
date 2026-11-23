@@ -99,6 +99,27 @@ public class Vocabulary {
     private static final Pattern DIGITS = Pattern.compile("\\b(\\d{1,2})\\b");
     private static final Pattern NUMBER_WORD = Pattern.compile("\\b(" + String.join("|", NUMBER_WORDS.keySet()) + ")\\b");
 
+    /**
+     * Exact-token markers used only to pick which language to answer in. Deliberately excludes
+     * short words that collide with real English usage in this app (e.g. "per" in "per genre",
+     * "a"/"e"/"ne" as English letters/words) - a false positive here would answer an English
+     * question in Albanian, which is worse than an occasional missed Albanian question.
+     */
+    private static final List<String> ALBANIAN_MARKERS = List.of(
+        "sa", "libra", "liber", "librat", "libri", "librin", "librit", "kam", "kush", "cili", "cila",
+        "cilat", "eshte", "jane", "nuk", "nga", "autor", "gjini", "zhanr", "zhanret", "shtrenjte",
+        "lire", "mesatar", "mesatarisht", "bashke", "gjithe", "perfunduar", "lexuar", "lexoj", "faqe",
+        "cmim", "kosto", "vlera", "te", "dhe", "kjo", "une", "ka", "qe", "pa", "mbi", "nen", "kerko",
+        "gjej", "secili", "cdo", "keni", "ke", "duke", "shfaq", "trego", "tregoni");
+
+    /** True if the question looks Albanian (see {@link #ALBANIAN_MARKERS}); otherwise treated as English. */
+    public static boolean isAlbanian(String question) {
+        for (String word : Normalizer.words(Normalizer.normalize(question))) {
+            if (ALBANIAN_MARKERS.contains(word)) return true;
+        }
+        return false;
+    }
+
     /** True if any of the phrases appears in {@code q}, allowing a one/two-character typo per word. */
     public boolean any(String q, Collection<String> phrases) {
         for (String phrase : phrases) {
