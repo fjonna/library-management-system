@@ -69,6 +69,77 @@ class SummaryFormatterTest {
     }
 
     @Test
+    void groupSummaryNamesBothGroupsOnATieOfTwoInEnglish() {
+        QuerySpec spec = new QuerySpec(Aggregate.GROUP_COUNT, null, Filters.NONE, GroupBy.USER, null, null);
+        Table t = new Table(List.of("User", "Books"),
+            List.of(List.of("fjofjo", 2L), List.of("xhesi", 2L), List.of("bob", 1L)));
+        assertThat(fmt.groupSummary(spec, true, false, t))
+            .isEqualTo("fjofjo and xhesi are tied with 2 books each.");
+    }
+
+    @Test
+    void groupSummaryNamesAllGroupsOnATieOfThreeInEnglish() {
+        QuerySpec spec = new QuerySpec(Aggregate.GROUP_COUNT, null, Filters.NONE, GroupBy.USER, null, null);
+        Table t = new Table(List.of("User", "Books"),
+            List.of(List.of("a", 2L), List.of("b", 2L), List.of("c", 2L), List.of("bob", 1L)));
+        assertThat(fmt.groupSummary(spec, true, false, t))
+            .isEqualTo("a, b and c are tied with 2 books each.");
+    }
+
+    @Test
+    void groupSummaryNamesTieOfTwoInAlbanian() {
+        QuerySpec spec = new QuerySpec(Aggregate.GROUP_COUNT, null, Filters.NONE, GroupBy.USER, null, null);
+        Table t = new Table(List.of("User", "Books"),
+            List.of(List.of("fjofjo", 2L), List.of("xhesi", 2L), List.of("bob", 1L)));
+        assertThat(fmt.groupSummary(spec, true, true, t))
+            .isEqualTo("fjofjo dhe xhesi kanë nga 2 libra secili.");
+    }
+
+    @Test
+    void groupSummaryNamesTieOfThreeInAlbanian() {
+        QuerySpec spec = new QuerySpec(Aggregate.GROUP_COUNT, null, Filters.NONE, GroupBy.USER, null, null);
+        Table t = new Table(List.of("User", "Books"),
+            List.of(List.of("a", 2L), List.of("b", 2L), List.of("c", 2L), List.of("bob", 1L)));
+        assertThat(fmt.groupSummary(spec, true, true, t))
+            .isEqualTo("a, b dhe c kanë nga 2 libra secili.");
+    }
+
+    @Test
+    void groupSummaryWithNoTieStillNamesOnlyTheWinner() {
+        QuerySpec spec = new QuerySpec(Aggregate.GROUP_COUNT, null, Filters.NONE, GroupBy.USER, null, null);
+        Table t = new Table(List.of("User", "Books"), List.of(List.of("alice", 5L), List.of("bob", 2L)));
+        assertThat(fmt.groupSummary(spec, true, false, t))
+            .isEqualTo("alice has the most books (5) among 2 users.");
+        assertThat(fmt.groupSummary(spec, true, true, t))
+            .isEqualTo("alice ka më shumë libra (5) mes 2 përdoruesve.");
+    }
+
+    @Test
+    void listSummaryNamesBothBooksOnATiedOrderByValue() {
+        QuerySpec spec = new QuerySpec(Aggregate.LIST, null, Filters.NONE, null,
+            new QuerySpec.OrderBy(Field.PAGES, QuerySpec.Direction.DESC), null);
+        Table t = new Table(List.of("ID", "Title", "Author", "Genre", "Status", "Price", "Pages"),
+            List.of(
+                List.of(1, "Dune", "Frank Herbert", "sci-fi", "TO_READ", BigDecimal.ONE, 600),
+                List.of(2, "War and Peace", "Tolstoy", "fiction", "TO_READ", BigDecimal.ONE, 600),
+                List.of(3, "Short Book", "Someone", "fiction", "TO_READ", BigDecimal.ONE, 100)));
+        assertThat(fmt.listSummary(spec, false, false, t))
+            .isEqualTo("'Dune' and 'War and Peace' are tied with 600 pages each.");
+    }
+
+    @Test
+    void listSummaryWithNoTieStillNamesOnlyTheWinner() {
+        QuerySpec spec = new QuerySpec(Aggregate.LIST, null, Filters.NONE, null,
+            new QuerySpec.OrderBy(Field.PAGES, QuerySpec.Direction.DESC), null);
+        Table t = new Table(List.of("ID", "Title", "Author", "Genre", "Status", "Price", "Pages"),
+            List.of(
+                List.of(1, "Dune", "Frank Herbert", "sci-fi", "TO_READ", BigDecimal.ONE, 600),
+                List.of(2, "Short Book", "Someone", "fiction", "TO_READ", BigDecimal.ONE, 100)));
+        assertThat(fmt.listSummary(spec, false, false, t))
+            .isEqualTo("The book with the highest pages in your library is 'Dune'.");
+    }
+
+    @Test
     void understoodAsListsAggregateFieldAndFilters() {
         Filters f = new Filters("fantasy", null, null, null, null, null, null, null);
         QuerySpec spec = new QuerySpec(Aggregate.AVG, Field.PAGES, f, null, null, null);

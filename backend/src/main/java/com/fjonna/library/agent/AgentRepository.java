@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -45,9 +46,14 @@ public class AgentRepository {
     private record Where(String sql, Map<String, Object> params) {
     }
 
-    /** Runs a {@link SqlBuilder.BuiltSql}: the fixed, parameterized SQL built by {@link SqlBuilder} for a {@link QuerySpec}. */
+    /**
+     * Runs a {@link SqlBuilder.BuiltSql}: the fixed, parameterized SQL built by {@link SqlBuilder} for a
+     * {@link QuerySpec}. {@link SqlBuilder} already over-fetches (see its {@code DEFAULT_LIMIT}) so the
+     * requested {@code displayLimit} can still be extended here to include any row tied with the cutoff.
+     */
     public Table run(SqlBuilder.BuiltSql built) {
-        return run(built.sql(), built.params());
+        Table full = run(built.sql(), built.params());
+        return built.tieColumn() < 0 ? truncate(full, built.displayLimit()) : withTies(full, built.displayLimit(), built.tieColumn());
     }
 
     public List<String> genres(UUID scope) {
@@ -67,6 +73,16 @@ public class AgentRepository {
         return spec.query(String.class).list();
     }
 
+    /** Column index (within this method's select list) to detect ties on for a given {@link Sort}, or -1. */
+    private static int tieColumnForSort(Sort sort) {
+        return switch (sort) {
+            case PRICE_DESC, PRICE_ASC -> 5;
+            case PAGES_DESC -> 6;
+            case NEWEST -> -1;
+        };
+    }
+
+    /** Ranked book list; rows tied with the one at the {@code limit} cutoff are kept too (see {@link #withTies}). */
     public Table books(Filter f, boolean admin, Sort sort, int limit) {
         Where w = where(f);
         String sql = "select b.id as \"ID\", b.title as \"Title\", b.author as \"Author\", b.genre as \"Genre\","
@@ -74,9 +90,11 @@ public class AgentRepository {
             + (admin ? ", u.username as \"Owner\"" : "")
             + " from books b join users u on u.id = b.user_id"
             + w.sql() + sort.condition
-            + " order by " + sort.orderBy + ", b.id limit :lim";
-        w.params().put("lim", limit);
-        return run(sql, w.params());
+            + " order by " + sort.orderBy + ", b.title, b.id limit :lim";
+        w.params().put("lim", TOP_FETCH_CAP);
+        Table full = run(sql, w.params());
+        int tieColumn = tieColumnForSort(sort);
+        return tieColumn < 0 ? truncate(full, limit) : withTies(full, limit, tieColumn);
     }
 
     public Table count(Filter f) {
@@ -117,13 +135,15 @@ public class AgentRepository {
             + " from books b join users u on u.id = b.user_id" + w.sql() + " and b.price is not null", w.params());
     }
 
+    /** Rows tied with the one at the {@code limit} cutoff are kept too (see {@link #withTies}). */
     public Table topAuthor(Filter f, int limit) {
         Where w = where(f);
         String sql = "select b.author as \"Author\", count(*) as \"Books\""
             + " from books b join users u on u.id = b.user_id" + w.sql()
             + " group by b.author order by 2 desc, 1 limit :lim";
-        w.params().put("lim", limit);
-        return run(sql, w.params());
+        w.params().put("lim", TOP_FETCH_CAP);
+        Table full = run(sql, w.params());
+        return withTies(full, limit, 1);
     }
 
     public Table searchTitle(Filter f, boolean admin, String text, int limit) {
@@ -141,19 +161,51 @@ public class AgentRepository {
         return run(sql, w.params());
     }
 
-    /** Admin only (enforced in AgentService). */
+    /** Upper bound on rows fetched for a "top N" ranking, so a tie at the cutoff can still be detected. */
+    private static final int TOP_FETCH_CAP = 50;
+
+    /** Admin only (enforced in AgentService). Rows tied with the one at the {@code limit} cutoff are kept too. */
     public Table topOwners(int limit) {
-        return run("select u.username as \"User\", count(b.id) as \"Books\""
+        Table full = run("select u.username as \"User\", count(b.id) as \"Books\""
             + " from users u left join books b on b.user_id = u.id"
-            + " group by u.username order by 2 desc, 1 limit :lim", Map.of("lim", limit));
+            + " group by u.username order by 2 desc, 1 limit :lim", Map.of("lim", TOP_FETCH_CAP));
+        return withTies(full, limit, 1);
     }
 
-    /** "Popular" = same title and author owned by the most different users. Aggregates only, no owner names. */
+    /**
+     * "Popular" = same title and author owned by the most different users. Aggregates only, no owner names.
+     * Rows tied with the one at the {@code limit} cutoff are kept too.
+     */
     public Table popularBooks(int limit) {
-        return run("select min(b.title) as \"Title\", min(b.author) as \"Author\","
+        Table full = run("select min(b.title) as \"Title\", min(b.author) as \"Author\","
             + " count(distinct b.user_id) as \"Owners\""
             + " from books b group by lower(trim(b.title)), lower(trim(b.author))"
-            + " order by 3 desc, 1 limit :lim", Map.of("lim", limit));
+            + " order by 3 desc, 1 limit :lim", Map.of("lim", TOP_FETCH_CAP));
+        return withTies(full, limit, 2);
+    }
+
+    /**
+     * Keeps the first {@code limit} rows of {@code full} (already ordered by {@code valueCol} desc),
+     * plus any further rows whose {@code valueCol} ties the value at the cutoff - so a tie straddling
+     * the requested limit is never silently cut in half. Bounded by how many rows {@code full} holds,
+     * i.e. {@link #TOP_FETCH_CAP}.
+     */
+    private static Table withTies(Table full, int limit, int valueCol) {
+        List<List<Object>> rows = full.rows();
+        if (limit >= rows.size()) return full;
+        Object cutoffValue = rows.get(limit - 1).get(valueCol);
+        int end = limit;
+        while (end < rows.size() && Objects.equals(rows.get(end).get(valueCol), cutoffValue)) {
+            end++;
+        }
+        return new Table(full.columns(), rows.subList(0, end));
+    }
+
+    /** Plain cutoff with no tie column to check (e.g. "most recent" - created_at isn't a displayed column). */
+    private static Table truncate(Table full, int limit) {
+        List<List<Object>> rows = full.rows();
+        if (limit >= rows.size()) return full;
+        return new Table(full.columns(), rows.subList(0, limit));
     }
 
     private Where where(Filter f) {

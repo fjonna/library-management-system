@@ -8,6 +8,7 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Builds the human-readable parts of a {@link QueryResult} (title, "understood as" sentence,
@@ -187,16 +188,29 @@ public class SummaryFormatter {
             String where = admin ? "in the whole library" : "in your library";
             return desc.isEmpty() ? "No data to group " + where + "." : "No data to group " + where + " " + desc + ".";
         }
-        Object topGroup = t.rows().get(0).get(0);
         Object topValue = t.rows().get(0).get(1);
+        List<String> topGroups = new ArrayList<>();
+        for (List<Object> row : t.rows()) {
+            if (!Objects.equals(row.get(1), topValue)) break;
+            topGroups.add(String.valueOf(row.get(0)));
+        }
+        String formattedValue = formatValue(spec.field(), topValue);
         if (albanian) {
             String what = spec.field() == null ? "libra" : fieldWordAl(spec.field());
-            return topGroup + " ka më shumë " + what + " (" + formatValue(spec.field(), topValue) + ") mes "
+            if (topGroups.size() > 1) {
+                return joinNames(topGroups, true) + " kanë nga " + formattedValue + " " + what + " secili."
+                    + (desc.isEmpty() ? "" : " (" + desc + ")");
+            }
+            return topGroups.get(0) + " ka më shumë " + what + " (" + formattedValue + ") mes "
                 + pluralizeAl(t.rows().size(), groupWordAl(spec.groupBy()), groupWordAl(spec.groupBy()) + "ve") + "."
                 + (desc.isEmpty() ? "" : " (" + desc + ")");
         }
         String what = spec.field() == null ? "books" : fieldWord(spec.field());
-        return topGroup + " has the most " + what + " (" + formatValue(spec.field(), topValue) + ") among "
+        if (topGroups.size() > 1) {
+            return joinNames(topGroups, false) + " are tied with " + formattedValue + " " + what + " each."
+                + (desc.isEmpty() ? "" : " (" + desc + ")");
+        }
+        return topGroups.get(0) + " has the most " + what + " (" + formattedValue + ") among "
             + pluralize(t.rows().size(), groupWord(spec.groupBy()).toLowerCase(Locale.ROOT)) + "."
             + (desc.isEmpty() ? "" : " (" + desc + ")");
     }
@@ -205,17 +219,38 @@ public class SummaryFormatter {
         if (t.rows().isEmpty()) return noMatchMessage(spec, admin, albanian);
         String desc = naturalFilters(spec.filters(), albanian);
         if (spec.orderBy() != null) {
-            String title = String.valueOf(t.rows().get(0).get(1));
+            int titleIdx = t.columns().indexOf("Title");
+            int valueIdx = columnIndexForField(t, spec.orderBy().field());
+            List<String> topTitles = new ArrayList<>();
+            if (valueIdx >= 0) {
+                Object topVal = t.rows().get(0).get(valueIdx);
+                for (List<Object> row : t.rows()) {
+                    if (!Objects.equals(row.get(valueIdx), topVal)) break;
+                    topTitles.add(String.valueOf(row.get(titleIdx)));
+                }
+            } else {
+                topTitles.add(String.valueOf(t.rows().get(0).get(titleIdx)));
+            }
             if (albanian) {
                 String verb = spec.orderBy().direction() == QuerySpec.Direction.ASC ? "më të ulët" : "më të lartë";
                 String who = admin ? "në bibliotekë" : "që ke";
+                if (topTitles.size() > 1) {
+                    Object val = t.rows().get(0).get(valueIdx);
+                    return joinQuoted(topTitles, true) + " kanë nga " + formatValue(spec.orderBy().field(), val)
+                        + " " + fieldWordAl(spec.orderBy().field()) + " secili." + (desc.isEmpty() ? "" : " (" + desc + ")");
+                }
                 return "Libri me " + fieldWordAl(spec.orderBy().field()) + " " + verb + " " + who
-                    + " është '" + title + "'." + (desc.isEmpty() ? "" : " (" + desc + ")");
+                    + " është '" + topTitles.get(0) + "'." + (desc.isEmpty() ? "" : " (" + desc + ")");
             }
             String verb = spec.orderBy().direction() == QuerySpec.Direction.ASC ? "lowest" : "highest";
             String where = admin ? "in the whole library" : "in your library";
+            if (topTitles.size() > 1) {
+                Object val = t.rows().get(0).get(valueIdx);
+                return joinQuoted(topTitles, false) + " are tied with " + formatValue(spec.orderBy().field(), val)
+                    + " " + fieldWord(spec.orderBy().field()) + " each." + (desc.isEmpty() ? "" : " (" + desc + ")");
+            }
             return "The book with the " + verb + " " + fieldWord(spec.orderBy().field()) + " " + where
-                + " is '" + title + "'." + (desc.isEmpty() ? "" : " (" + desc + ")");
+                + " is '" + topTitles.get(0) + "'." + (desc.isEmpty() ? "" : " (" + desc + ")");
         }
         if (albanian) {
             String who = admin ? "në bibliotekë" : "që ke";
@@ -315,6 +350,37 @@ public class SummaryFormatter {
             case STATUS -> "status";
             case USER -> "përdorues";
         };
+    }
+
+    /** Index of the column holding {@code field}'s value in a book-row {@link Table}, or -1 if absent. */
+    private static int columnIndexForField(Table t, Field field) {
+        String label = switch (field) {
+            case PRICE -> "Price";
+            case PAGES -> "Pages";
+            case TITLE -> "Title";
+            case AUTHOR -> "Author";
+            case GENRE -> "Genre";
+            case STATUS -> "Status";
+            case CREATED_AT -> "Added";
+        };
+        return t.columns().indexOf(label);
+    }
+
+    /** {@link #joinNames} with each name single-quoted, e.g. for book titles. */
+    private static String joinQuoted(List<String> names, boolean albanian) {
+        List<String> quoted = names.stream().map(n -> "'" + n + "'").toList();
+        return joinNames(quoted, albanian);
+    }
+
+    /**
+     * Joins names in natural reading order for a tie: "a and b" (2), "a, b and c" (3+), or just
+     * "a dhe b" / "a, b dhe c" in Albanian. Never used for a single name.
+     */
+    static String joinNames(List<String> names, boolean albanian) {
+        if (names.size() == 1) return names.get(0);
+        String and = albanian ? " dhe " : " and ";
+        if (names.size() == 2) return names.get(0) + and + names.get(1);
+        return String.join(", ", names.subList(0, names.size() - 1)) + and + names.get(names.size() - 1);
     }
 
     /** Capitalizes just the first letter, e.g. "fantasy" -> "Fantasy". */

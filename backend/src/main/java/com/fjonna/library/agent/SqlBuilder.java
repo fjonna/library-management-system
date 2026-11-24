@@ -19,7 +19,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class SqlBuilder {
 
-    public record BuiltSql(String sql, Map<String, Object> params) {
+    /**
+     * {@code displayLimit}/{@code tieColumn} let {@link AgentRepository#run(BuiltSql)} fetch a
+     * generous buffer (see {@link #DEFAULT_LIMIT}) but still show only {@code displayLimit} rows -
+     * plus any further rows tied with the one at that cutoff on column {@code tieColumn} (-1 means
+     * "no tie column to check", e.g. a plain count/scalar result with nothing to trim).
+     */
+    public record BuiltSql(String sql, Map<String, Object> params, int displayLimit, int tieColumn) {
+        public BuiltSql(String sql, Map<String, Object> params) {
+            this(sql, params, Integer.MAX_VALUE, -1);
+        }
     }
 
     private static final Map<Field, String> COLUMN = Map.of(
@@ -74,22 +83,38 @@ public class SqlBuilder {
         return new BuiltSql(sql, params);
     }
 
+    /** Position of {@code field}'s column in {@link #buildList}'s fixed select list, or -1 if not selected. */
+    private static int listTieColumn(Field field) {
+        return switch (field) {
+            case TITLE -> 1;
+            case AUTHOR -> 2;
+            case GENRE -> 3;
+            case STATUS -> 4;
+            case PRICE -> 5;
+            case PAGES -> 6;
+            case CREATED_AT -> -1;
+        };
+    }
+
     private BuiltSql buildList(QuerySpec spec, boolean admin, String where, Map<String, Object> params) {
         String ownerCol = admin ? ", u.username as \"Owner\"" : "";
         String orderSql;
+        int tieColumn;
         if (spec.orderBy() != null) {
             String col = COLUMN.get(spec.orderBy().field());
-            orderSql = col + " " + direction(spec.orderBy().direction()) + " nulls last, b.id";
+            orderSql = col + " " + direction(spec.orderBy().direction()) + " nulls last, b.title, b.id";
+            tieColumn = listTieColumn(spec.orderBy().field());
         } else {
-            orderSql = "b.created_at desc, b.id";
+            orderSql = "b.created_at desc, b.title, b.id";
+            tieColumn = -1;
         }
-        int limit = spec.limit() == null ? DEFAULT_LIMIT : spec.limit();
-        params.put("lim", limit);
+        int displayLimit = spec.limit() == null ? DEFAULT_LIMIT : spec.limit();
+        params.put("lim", DEFAULT_LIMIT);
         String sql = "select b.id as \"ID\", b.title as \"Title\", b.author as \"Author\", b.genre as \"Genre\","
             + " b.status as \"Status\", b.price as \"Price\", b.pages as \"Pages\"" + ownerCol
             + " from books b join users u on u.id = b.user_id" + where
             + " order by " + orderSql + " limit :lim";
-        return new BuiltSql(sql, params);
+        return new BuiltSql(sql, params, displayLimit, tieColumn);
     }
 
     private BuiltSql buildGrouped(QuerySpec spec, String where, Map<String, Object> params) {
@@ -113,13 +138,13 @@ public class SqlBuilder {
             valueLabel = FIELD_LABEL.get(spec.field());
         }
         Direction dir = spec.orderBy() != null ? spec.orderBy().direction() : Direction.DESC;
-        int limit = spec.limit() == null ? DEFAULT_LIMIT : spec.limit();
-        params.put("lim", limit);
+        int displayLimit = spec.limit() == null ? DEFAULT_LIMIT : spec.limit();
+        params.put("lim", DEFAULT_LIMIT);
 
         String sql = "select " + groupCol + " as \"" + groupLabel + "\", " + valueExpr + " as \"" + valueLabel + "\""
             + " from " + from + where
             + " group by 1 order by 2 " + direction(dir) + ", 1 limit :lim";
-        return new BuiltSql(sql, params);
+        return new BuiltSql(sql, params, displayLimit, 1);
     }
 
     private static String aggregateFunction(Aggregate aggregate) {

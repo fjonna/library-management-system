@@ -39,6 +39,9 @@ public class QueryParser {
     }
 
     private Intent deriveIntent(String question, QuerySpec spec) {
+        if (specParser.isPopularGenreQuestion(question)) {
+            return Intent.MOST_POPULAR_GENRE;
+        }
         if (specParser.isPopularQuestion(question)) {
             return Intent.MOST_POPULAR_BOOK;
         }

@@ -27,6 +27,31 @@ class QueryParserTest {
     }
 
     @Test
+    void mostPopularGenreEnglishIsNotMisroutedToMostPopularBook() {
+        assertThat(parse("What is the most popular genre?").intent()).isEqualTo(Intent.MOST_POPULAR_GENRE);
+    }
+
+    @Test
+    void mostCommonGenreEnglish() {
+        assertThat(parse("What's the most common genre in my library?").intent()).isEqualTo(Intent.MOST_POPULAR_GENRE);
+    }
+
+    @Test
+    void mostPopularGenreAlbanian() {
+        assertThat(parse("Cili është zhanri më i popullarizuar?").intent()).isEqualTo(Intent.MOST_POPULAR_GENRE);
+    }
+
+    @Test
+    void whichGenreHasTheMostBooksAlbanian() {
+        assertThat(parse("Cili zhanër ka më shumë libra?").intent()).isEqualTo(Intent.MOST_POPULAR_GENRE);
+    }
+
+    @Test
+    void plainGenreBreakdownIsNotMisroutedToMostPopularGenre() {
+        assertThat(parse("How many books per genre?").intent()).isEqualTo(Intent.GENRE_BREAKDOWN);
+    }
+
+    @Test
     void fiveMostExpensive() {
         QueryParser.Parsed p = parse("Show the five most expensive books");
         assertThat(p.intent()).isEqualTo(Intent.TOP_EXPENSIVE);

@@ -10,7 +10,6 @@ import com.fjonna.library.insight.InsightRepository.Counts;
 import com.fjonna.library.insight.InsightRepository.GenreCount;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +37,7 @@ class InsightServiceTest {
         when(repo.counts(uid)).thenReturn(new Counts(3, 1, 1, 1));
         when(repo.averages(uid)).thenReturn(new Averages(new BigDecimal("12.50"), 180.0));
         when(repo.genreCounts(uid)).thenReturn(List.of(new GenreCount("Fantasy", 2), new GenreCount("Drama", 1)));
-        when(repo.mostExpensiveBook(uid)).thenReturn(Optional.of(new BookPrice("Dune", new BigDecimal("20.00"))));
+        when(repo.mostExpensiveBooks(uid)).thenReturn(List.of(new BookPrice("Dune", new BigDecimal("20.00"))));
 
         InsightResponse result = service.insights(uid);
 
@@ -56,11 +55,11 @@ class InsightServiceTest {
         when(repo.counts(uid)).thenReturn(new Counts(4, 2, 1, 1));
         when(repo.averages(uid)).thenReturn(new Averages(null, 500.0));
         when(repo.genreCounts(uid)).thenReturn(List.of(new GenreCount("Drama", 2), new GenreCount("Fantasy", 2)));
-        when(repo.mostExpensiveBook(uid)).thenReturn(Optional.empty());
+        when(repo.mostExpensiveBooks(uid)).thenReturn(List.of());
 
         InsightResponse result = service.insights(uid);
 
-        assertThat(result.stats().topGenre()).isEqualTo("Drama");
+        assertThat(result.stats().topGenre()).isEqualTo("Drama, Fantasy");
         assertThat(result.stats().averagePrice()).isNull();
         assertThat(result.sentences()).containsExactly(
             "Drama and Fantasy are tied as your most read genres (2 books each).",
@@ -69,11 +68,37 @@ class InsightServiceTest {
     }
 
     @Test
+    void tiedMostExpensiveBooksAreAllNamedInTheSentence() {
+        when(repo.counts(uid)).thenReturn(new Counts(3, 1, 1, 1));
+        when(repo.averages(uid)).thenReturn(new Averages(new BigDecimal("20.00"), 180.0));
+        when(repo.genreCounts(uid)).thenReturn(List.of(new GenreCount("Fantasy", 2), new GenreCount("Drama", 1)));
+        when(repo.mostExpensiveBooks(uid)).thenReturn(List.of(
+            new BookPrice("Dune", new BigDecimal("20.00")), new BookPrice("1984", new BigDecimal("20.00"))));
+
+        InsightResponse result = service.insights(uid);
+
+        assertThat(result.sentences()).contains("Your most expensive books are 'Dune' and '1984', each at 20.00.");
+    }
+
+    @Test
+    void tiedTopGenreStatTileJoinsEveryTiedGenreSoItDoesNotContradictTheSentence() {
+        when(repo.counts(uid)).thenReturn(new Counts(6, 2, 2, 2));
+        when(repo.averages(uid)).thenReturn(new Averages(new BigDecimal("12.50"), 300.0));
+        when(repo.genreCounts(uid)).thenReturn(List.of(
+            new GenreCount("Drama", 2), new GenreCount("Fantasy", 2), new GenreCount("Sci-Fi", 2)));
+        when(repo.mostExpensiveBooks(uid)).thenReturn(List.of());
+
+        InsightResponse result = service.insights(uid);
+
+        assertThat(result.stats().topGenre()).isEqualTo("Drama, Fantasy, Sci-Fi");
+    }
+
+    @Test
     void summaryTemplateSkipsTheRedundantFinishedSentence() {
         when(repo.counts(uid)).thenReturn(new Counts(3, 1, 1, 1));
         when(repo.averages(uid)).thenReturn(new Averages(new BigDecimal("12.50"), 180.0));
         when(repo.genreCounts(uid)).thenReturn(List.of(new GenreCount("Fantasy", 2)));
-        when(repo.mostExpensiveBook(uid)).thenReturn(Optional.of(new BookPrice("Dune", new BigDecimal("20.00"))));
+        when(repo.mostExpensiveBooks(uid)).thenReturn(List.of(new BookPrice("Dune", new BigDecimal("20.00"))));
 
         String summary = service.summary(uid);
 

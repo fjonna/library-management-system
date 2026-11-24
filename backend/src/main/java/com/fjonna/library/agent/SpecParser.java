@@ -123,6 +123,18 @@ public class SpecParser {
         return vocab.any(Normalizer.normalize(question), Vocabulary.POPULAR_WORDS);
     }
 
+    /**
+     * True for a question about which GENRE is most/popular/common (e.g. "most popular genre",
+     * "zhanri më i popullarizuar", "cili zhanër ka më shumë libra") - checked by {@link QueryParser}
+     * before {@link #isPopularQuestion}, so these don't get misrouted to the book-level
+     * MOST_POPULAR_BOOK intent just because they also contain a "popular"/"most" word.
+     */
+    boolean isPopularGenreQuestion(String question) {
+        String q = Normalizer.normalize(question);
+        return vocab.any(q, Vocabulary.GENRE_WORDS)
+            && (vocab.any(q, Vocabulary.POPULAR_WORDS) || vocab.any(q, Vocabulary.SUPERLATIVE_WORDS));
+    }
+
     boolean hasGenericBookCue(String question) {
         return vocab.any(Normalizer.normalize(question), Vocabulary.GENERIC_BOOK_WORDS);
     }

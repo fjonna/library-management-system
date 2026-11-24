@@ -63,7 +63,7 @@ public class Vocabulary {
         "who owns", "who has", "which user", "which person", "which member", "each user", "per user",
         "kush ka", "cili perdorues", "cili anetar", "secili perdorues");
     static final List<String> POPULAR_WORDS = List.of(
-        "popular", "common", "bestsell", "popullor", "me i njohur", "me i shitur", "me i lexuar");
+        "popular", "common", "bestsell", "popullor", "popullarizuar", "me i njohur", "me i shitur", "me i lexuar");
 
     // ---- status cues ----------------------------------------------------------------------------
     static final List<String> TO_READ_WORDS = List.of(

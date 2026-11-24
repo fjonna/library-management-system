@@ -40,7 +40,11 @@ class SqlBuilderTest {
             new OrderBy(Field.PRICE, Direction.ASC), 5);
         BuiltSql built = builder.build(spec, scope, false);
         assertThat(built.sql()).contains("order by b.price asc").contains("limit :lim");
-        assertThat(built.params()).containsEntry("lim", 5);
+        // the SQL itself fetches a generous buffer (not the requested 5) so a tie straddling the
+        // cutoff can still be detected; displayLimit carries the originally-requested limit.
+        assertThat(built.params()).containsEntry("lim", 50);
+        assertThat(built.displayLimit()).isEqualTo(5);
+        assertThat(built.tieColumn()).isEqualTo(5);
     }
 
     @Test

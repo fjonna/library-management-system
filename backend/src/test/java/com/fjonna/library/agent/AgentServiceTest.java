@@ -74,6 +74,72 @@ class AgentServiceTest {
     }
 
     @Test
+    void topAuthorNamesBothAuthorsOnATieInEnglish() {
+        stubParse(Intent.TOP_AUTHOR);
+        when(repo.topAuthor(any(), anyInt())).thenReturn(new Table(List.of("Author", "Books"),
+            List.of(List.of("Frank Herbert", 3L), List.of("George Orwell", 3L))));
+
+        QueryResult result = service.answer(uid, false, "Which author has the most books?");
+
+        assertThat(result.summary()).isEqualTo("Frank Herbert and George Orwell are tied with 3 books each in your library.");
+    }
+
+    @Test
+    void topAuthorNamesTiedAuthorsInAlbanian() {
+        stubParse(Intent.TOP_AUTHOR);
+        when(repo.topAuthor(any(), anyInt())).thenReturn(new Table(List.of("Author", "Books"),
+            List.of(List.of("Frank Herbert", 3L), List.of("George Orwell", 3L))));
+
+        QueryResult result = service.answer(uid, false, "Cili autor ka më shumë libra?");
+
+        assertThat(result.summary()).isEqualTo("Frank Herbert dhe George Orwell kanë nga 3 libra secili te librat e tu.");
+    }
+
+    @Test
+    void topAuthorStillNamesOnlyTheWinnerWithNoTie() {
+        stubParse(Intent.TOP_AUTHOR);
+        when(repo.topAuthor(any(), anyInt())).thenReturn(new Table(List.of("Author", "Books"),
+            List.of(List.of("Frank Herbert", 5L), List.of("George Orwell", 2L))));
+
+        QueryResult result = service.answer(uid, false, "Which author has the most books?");
+
+        assertThat(result.summary()).isEqualTo("Frank Herbert has the most books in your library (5).");
+    }
+
+    @Test
+    void mostPopularGenreNamesWinnerScopedToUsersOwnBooks() {
+        stubParse(Intent.MOST_POPULAR_GENRE);
+        when(repo.genreBreakdown(any())).thenReturn(new Table(List.of("Genre", "Books"),
+            List.of(List.of("Fantasy", 5L), List.of("Drama", 2L))));
+
+        QueryResult result = service.answer(uid, false, "What is the most popular genre?");
+
+        assertThat(result.summary()).isEqualTo("Fantasy has the most books (5) among 2 genres.");
+    }
+
+    @Test
+    void mostPopularGenreNamesAllTiedGenresForAdminAcrossTheWholeLibrary() {
+        stubParse(Intent.MOST_POPULAR_GENRE);
+        when(repo.genreBreakdown(any())).thenReturn(new Table(List.of("Genre", "Books"),
+            List.of(List.of("Drama", 4L), List.of("Fantasy", 4L), List.of("Sci-Fi", 1L))));
+
+        QueryResult result = service.answer(uid, true, "Which genre is most popular?");
+
+        assertThat(result.summary()).isEqualTo("Drama and Fantasy are tied with 4 books each.");
+    }
+
+    @Test
+    void mostPopularGenreInAlbanian() {
+        stubParse(Intent.MOST_POPULAR_GENRE);
+        when(repo.genreBreakdown(any())).thenReturn(new Table(List.of("Genre", "Books"),
+            List.of(List.of("Fantasy", 5L), List.of("Drama", 2L))));
+
+        QueryResult result = service.answer(uid, false, "Cili është zhanri më i popullarizuar?");
+
+        assertThat(result.summary()).isEqualTo("Fantasy ka më shumë libra (5) mes 2 zhanërve.");
+    }
+
+    @Test
     void countBooksWithCompletedStatusAndNoneYetReadsNaturallyInEnglish() {
         stubParseWithStatus(Intent.COUNT_BOOKS, BookStatus.COMPLETED);
         when(repo.count(any())).thenReturn(new Table(List.of("Books"), List.of(List.of(0L))));
@@ -92,6 +158,61 @@ class AgentServiceTest {
         QueryResult result = service.answer(uid, false, "Sa libra kam përfunduar?");
 
         assertThat(result.summary()).isEqualTo("Nuk ke asnjë libër të përfunduar.");
+    }
+
+    @Test
+    void mostBooksOwnerNamesBothOwnersOnATieInEnglish() {
+        stubParse(Intent.MOST_BOOKS_OWNER);
+        when(repo.topOwners(anyInt())).thenReturn(new Table(List.of("User", "Books"),
+            List.of(List.of("fjofjo", 2L), List.of("xhesi", 2L))));
+
+        QueryResult result = service.answer(uid, true, "Who owns the most books?");
+
+        assertThat(result.summary()).isEqualTo("fjofjo and xhesi are tied with 2 books each.");
+    }
+
+    @Test
+    void mostBooksOwnerNamesAllTiedOwnersOnATieOfThreeInAlbanian() {
+        stubParse(Intent.MOST_BOOKS_OWNER);
+        when(repo.topOwners(anyInt())).thenReturn(new Table(List.of("User", "Books"),
+            List.of(List.of("a", 2L), List.of("b", 2L), List.of("c", 2L))));
+
+        QueryResult result = service.answer(uid, true, "Kush ka më shumë libra?");
+
+        assertThat(result.summary()).isEqualTo("a, b dhe c kanë nga 2 libra secili.");
+    }
+
+    @Test
+    void mostBooksOwnerStillNamesOnlyTheWinnerWithNoTie() {
+        stubParse(Intent.MOST_BOOKS_OWNER);
+        when(repo.topOwners(anyInt())).thenReturn(new Table(List.of("User", "Books"),
+            List.of(List.of("fjofjo", 5L), List.of("xhesi", 2L))));
+
+        QueryResult result = service.answer(uid, true, "Who owns the most books?");
+
+        assertThat(result.summary()).isEqualTo("fjofjo owns the most books (5).");
+    }
+
+    @Test
+    void mostPopularBookNamesBothTitlesOnATieInEnglish() {
+        stubParse(Intent.MOST_POPULAR_BOOK);
+        when(repo.popularBooks(anyInt())).thenReturn(new Table(List.of("Title", "Author", "Owners"),
+            List.of(List.of("Dune", "Frank Herbert", 2L), List.of("1984", "George Orwell", 2L))));
+
+        QueryResult result = service.answer(uid, true, "Which is the most popular book?");
+
+        assertThat(result.summary()).isEqualTo("'Dune' and '1984' are tied, each owned by 2 users.");
+    }
+
+    @Test
+    void mostPopularBookNamesTiedTitlesInAlbanian() {
+        stubParse(Intent.MOST_POPULAR_BOOK);
+        when(repo.popularBooks(anyInt())).thenReturn(new Table(List.of("Title", "Author", "Owners"),
+            List.of(List.of("Dune", "Frank Herbert", 2L), List.of("1984", "George Orwell", 2L))));
+
+        QueryResult result = service.answer(uid, true, "Cili është libri më i popullarizuar?");
+
+        assertThat(result.summary()).isEqualTo("'Dune' dhe '1984' zotërohen nga 2 përdorues secili.");
     }
 
     @Test

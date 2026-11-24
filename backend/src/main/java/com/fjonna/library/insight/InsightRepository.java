@@ -2,7 +2,6 @@ package com.fjonna.library.insight;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -54,12 +53,13 @@ public class InsightRepository {
             .query(GenreCount.class).list();
     }
 
-    /** Ties resolve to the alphabetically first title. */
-    public Optional<BookPrice> mostExpensiveBook(UUID uid) {
+    /** Every book tied at the highest price (empty if none are priced), ordered by title. */
+    public List<BookPrice> mostExpensiveBooks(UUID uid) {
         return jdbc.sql("select title, price from books"
                 + " where user_id = :uid and price is not null"
-                + " order by price desc, title limit 1")
+                + " and price = (select max(price) from books where user_id = :uid and price is not null)"
+                + " order by title")
             .param("uid", uid)
-            .query(BookPrice.class).optional();
+            .query(BookPrice.class).list();
     }
 }

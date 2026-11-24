@@ -8,6 +8,7 @@ import com.fjonna.library.book.BookStatus;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -88,8 +89,12 @@ public class AgentService {
         String understood = understoodAs(p, admin);
 
         return switch (p.intent()) {
-            case MOST_BOOKS_OWNER -> admin ? owners(understood, top) : adminOnly();
-            case MOST_POPULAR_BOOK -> popular(understood, top);
+            case MOST_BOOKS_OWNER -> admin ? owners(understood, top, albanian) : adminOnly();
+            case MOST_POPULAR_BOOK -> popular(understood, top, albanian);
+            case MOST_POPULAR_GENRE -> {
+                Table t = repo.genreBreakdown(f);
+                yield result(p, understood, "Most popular genre", t, popularGenreSentence(t, admin, albanian));
+            }
             case TOP_EXPENSIVE -> {
                 Table t = repo.books(f, admin, Sort.PRICE_DESC, top);
                 yield result(p, understood, "Most expensive books", t,
@@ -233,21 +238,57 @@ public class AgentService {
         return score;
     }
 
-    private QueryResult owners(String understood, int top) {
+    private QueryResult owners(String understood, int top, boolean albanian) {
         Table t = repo.topOwners(top);
-        String summary = t.rows().isEmpty()
-            ? "There are no users yet."
-            : t.rows().get(0).get(0) + " owns the most books (" + t.rows().get(0).get(1) + ").";
+        String summary;
+        if (t.rows().isEmpty()) {
+            summary = "There are no users yet.";
+        } else {
+            Object topValue = t.rows().get(0).get(1);
+            List<String> tiedOwners = new ArrayList<>();
+            for (List<Object> row : t.rows()) {
+                if (!Objects.equals(row.get(1), topValue)) break;
+                tiedOwners.add(String.valueOf(row.get(0)));
+            }
+            if (tiedOwners.size() > 1) {
+                long count = ((Number) topValue).longValue();
+                summary = albanian
+                    ? SummaryFormatter.joinNames(tiedOwners, true) + " kanë nga " + count
+                        + " " + (count == 1 ? "libër" : "libra") + " secili."
+                    : SummaryFormatter.joinNames(tiedOwners, false) + " are tied with " + count
+                        + " " + (count == 1 ? "book" : "books") + " each.";
+            } else {
+                summary = tiedOwners.get(0) + " owns the most books (" + topValue + ").";
+            }
+        }
         return new QueryResult(Intent.MOST_BOOKS_OWNER.name(), understood, "Users with the most books",
             summary, t.columns(), t.rows(), false);
     }
 
-    private QueryResult popular(String understood, int top) {
+    private QueryResult popular(String understood, int top, boolean albanian) {
         Table t = repo.popularBooks(top);
-        String summary = t.rows().isEmpty()
-            ? "There are no books yet."
-            : "The most popular book is '" + t.rows().get(0).get(0) + "' by " + t.rows().get(0).get(1)
-                + ", owned by " + t.rows().get(0).get(2) + " user(s).";
+        String summary;
+        if (t.rows().isEmpty()) {
+            summary = "There are no books yet.";
+        } else {
+            Object topValue = t.rows().get(0).get(2);
+            List<String> tiedTitles = new ArrayList<>();
+            for (List<Object> row : t.rows()) {
+                if (!Objects.equals(row.get(2), topValue)) break;
+                tiedTitles.add(String.valueOf(row.get(0)));
+            }
+            if (tiedTitles.size() > 1) {
+                long count = ((Number) topValue).longValue();
+                List<String> quoted = tiedTitles.stream().map(title -> "'" + title + "'").toList();
+                summary = albanian
+                    ? SummaryFormatter.joinNames(quoted, true) + " zotërohen nga " + count + " përdorues secili."
+                    : SummaryFormatter.joinNames(quoted, false) + " are tied, each owned by " + count
+                        + " " + (count == 1 ? "user" : "users") + ".";
+            } else {
+                summary = "The most popular book is '" + t.rows().get(0).get(0) + "' by " + t.rows().get(0).get(1)
+                    + ", owned by " + topValue + " user(s).";
+            }
+        }
         return new QueryResult(Intent.MOST_POPULAR_BOOK.name(), understood, "Most popular books",
             summary, t.columns(), t.rows(), false);
     }
@@ -434,14 +475,30 @@ public class AgentService {
             if (albanian) return admin ? "Nuk ka ende libra në bibliotekë." : "Nuk ke ende asnjë libër.";
             return admin ? "There are no books in the library yet." : "You don't have any books yet.";
         }
-        Object author = t.rows().get(0).get(0);
-        Object count = t.rows().get(0).get(1);
+        Object topValue = t.rows().get(0).get(1);
+        List<String> tiedAuthors = new ArrayList<>();
+        for (List<Object> row : t.rows()) {
+            if (!Objects.equals(row.get(1), topValue)) break;
+            tiedAuthors.add(String.valueOf(row.get(0)));
+        }
         if (albanian) {
             String scope = admin ? "në bibliotekë" : "te librat e tu";
-            return author + " ka më shumë libra " + scope + " (" + count + ").";
+            if (tiedAuthors.size() > 1) {
+                return SummaryFormatter.joinNames(tiedAuthors, true) + " kanë nga " + topValue + " libra secili " + scope + ".";
+            }
+            return tiedAuthors.get(0) + " ka më shumë libra " + scope + " (" + topValue + ").";
         }
         String where = admin ? "in the whole library" : "in your library";
-        return author + " has the most books " + where + " (" + count + ").";
+        if (tiedAuthors.size() > 1) {
+            return SummaryFormatter.joinNames(tiedAuthors, false) + " are tied with " + topValue + " books each " + where + ".";
+        }
+        return tiedAuthors.get(0) + " has the most books " + where + " (" + topValue + ").";
+    }
+
+    /** Reuses {@link SummaryFormatter#groupSummary} so "most popular genre" names every tied genre too. */
+    private String popularGenreSentence(Table t, boolean admin, boolean albanian) {
+        QuerySpec spec = new QuerySpec(Aggregate.GROUP_COUNT, null, QuerySpec.Filters.NONE, GroupBy.GENRE, null, null);
+        return summaryFormatter.groupSummary(spec, admin, albanian, t);
     }
 
     private String searchTitleSentence(Table t, Parsed p, boolean admin, boolean albanian) {
@@ -465,6 +522,7 @@ public class AgentService {
         String sentence = switch (p.intent()) {
             case MOST_BOOKS_OWNER -> "Who owns the most books";
             case MOST_POPULAR_BOOK -> "The most popular book(s)";
+            case MOST_POPULAR_GENRE -> "The most popular genre";
             case TOP_EXPENSIVE -> "Most expensive books";
             case CHEAPEST -> "Cheapest books";
             case LONGEST -> "Longest books by page count";

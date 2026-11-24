@@ -3,6 +3,7 @@ package com.fjonna.library.agent;
 public enum Intent {
     MOST_BOOKS_OWNER,
     MOST_POPULAR_BOOK,
+    MOST_POPULAR_GENRE,
     TOP_EXPENSIVE,
     CHEAPEST,
     LONGEST,
