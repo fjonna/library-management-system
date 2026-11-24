@@ -20,6 +20,14 @@ spring:
         jwt:
           issuer-uri: ${JWT_ISSUER_URI:http://localhost:8081/auth/realms/library}
 
+# Keycloak Admin REST API client (admin "Delete user" also removes the Keycloak login account).
+# Called over the internal Docker network, never through the public-facing issuer URL above.
+keycloak:
+  admin:
+    base-url: ${KEYCLOAK_ADMIN_BASE_URL:http://keycloak:8080/auth}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:}
+    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:}
+
 management:
   endpoints:
     web:

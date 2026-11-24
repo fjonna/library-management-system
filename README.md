@@ -19,7 +19,7 @@ Built with Spring Boot, React, Keycloak, PostgreSQL and Docker Compose. Running 
 
 - **Accounts:** sign up and log in through Keycloak.
 - **Books:** each user adds, edits and deletes their own books (title, author, genre, status, price, pages, ISBN). Status is to read, reading or completed.
-- **Admin:** admins see every book (with its owner) and every user, can delete books and users, and can open any user's insights. An admin can't delete their own account.
+- **Admin:** admins see every book (with its owner) and every user, can delete books and permanently delete users (including their Keycloak login account), and can open any user's insights. An admin can't delete their own account.
 - **Ask the library:** a natural-language query agent. Users only get answers about their own books.
 - **Recommended:** suggestions based on what you already own and what similar readers own.
 - **Insights:** quick stats and a few generated sentences about your reading habits.
@@ -161,7 +161,7 @@ All endpoints except `/actuator/health` need a Keycloak token.
 | GET | `/api/admin/books` | ADMIN | Every book, with its owner |
 | PUT, DELETE | `/api/admin/books/{id}` | ADMIN | Update or delete any book |
 | GET | `/api/admin/users` | ADMIN | Every user |
-| DELETE | `/api/admin/users/{id}` | ADMIN | Delete a user and their books (not yourself) |
+| DELETE | `/api/admin/users/{id}` | ADMIN | Permanently delete a user: their Keycloak login account, profile and books (not yourself) |
 | GET | `/api/admin/insights/{userId}` | ADMIN | Insights for any user |
 | POST | `/api/admin/insights/{userId}/summary` | ADMIN | Summary for any user |
 
@@ -184,6 +184,7 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build
 | `LIBRARY_DB_PASSWORD` | The backend's database user |
 | `KEYCLOAK_VERSION` | Keycloak image tag (`26.5.1`) |
 | `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin login |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret for the `library-backend` service account the backend uses to delete Keycloak accounts (dev value is fixed in `docker-compose.override.yml`) |
 
 **Making someone an admin:** create an account in the app, then in the Keycloak console go to realm `library` → Users → the user → Role mapping → assign the realm role `ADMIN`.
 

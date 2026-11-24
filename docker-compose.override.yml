@@ -6,3 +6,8 @@ services:
     # live-reload theme CSS/properties changes without restarting; never set in prod
     environment:
       KC_SPI_THEME_CACHE_THEMES: "false"
+  backend:
+    # matches the fixed dev-only secret on the "library-backend" client in
+    # keycloak/realm/library-realm.json; never set in prod (prod reads this from .env instead)
+    environment:
+      KEYCLOAK_ADMIN_CLIENT_SECRET: dev-only-library-backend-secret-not-for-production

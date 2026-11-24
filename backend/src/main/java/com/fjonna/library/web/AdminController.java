@@ -3,6 +3,8 @@ package com.fjonna.library.web;
 import com.fjonna.library.book.BookRequest;
 import com.fjonna.library.book.BookResponse;
 import com.fjonna.library.book.BookService;
+import com.fjonna.library.keycloakadmin.KeycloakAdminClient;
+import com.fjonna.library.user.User;
 import com.fjonna.library.user.UserRepository;
 import com.fjonna.library.user.UserSummary;
 import jakarta.validation.Valid;
@@ -31,6 +33,7 @@ public class AdminController {
 
     private final BookService bookService;
     private final UserRepository userRepository;
+    private final KeycloakAdminClient keycloakAdminClient;
 
     /** page/size are optional; omitting both keeps today's "return everything" behavior for the frontend. */
     @GetMapping("/books")
@@ -63,16 +66,23 @@ public class AdminController {
         return userRepository.findAllSummaries(Paging.of(page, size));
     }
 
-    /** Removes the user and their books from the library DB (not from Keycloak). */
+    /**
+     * Permanently deletes the user: first their Keycloak login account, then their local profile
+     * and books. Order matters - if the Keycloak call fails, local data is left untouched (the
+     * exception propagates straight to {@link GlobalExceptionHandler}, which maps it to a 502,
+     * before either repository call below ever runs).
+     */
     @DeleteMapping("/users/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         if (id.toString().equals(jwt.getSubject())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot delete yourself");
         }
-        if (!userRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-        }
-        userRepository.deleteById(id);
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        // The local user's id IS the Keycloak user id (the JWT "sub" claim - see
+        // UserService#syncFromJwt), so there's no separate id to look up.
+        keycloakAdminClient.deleteUser(user.getId().toString());
+        userRepository.delete(user); // cascades to the user's books (ON DELETE CASCADE, see V1 migration)
     }
 }

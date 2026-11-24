@@ -10,6 +10,12 @@ services:
       JWT_ISSUER_URI: ${PUBLIC_URL:-http://localhost}/auth/realms/library
       # keys are fetched over the internal network
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/auth/realms/library/protocol/openid-connect/certs
+      # Keycloak Admin API client (admin "Delete user" also removes the Keycloak login account).
+      # Same client id in dev and prod; the secret differs (dev value in docker-compose.override.yml,
+      # prod value read from .env - never commit a real one here).
+      KEYCLOAK_ADMIN_BASE_URL: http://keycloak:8080/auth
+      KEYCLOAK_ADMIN_CLIENT_ID: library-backend
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
       JAVA_TOOL_OPTIONS: -Xmx384m
     depends_on:
       db:

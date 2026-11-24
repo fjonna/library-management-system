@@ -441,6 +441,21 @@
     "realmRoles" : [ "USER", "default-roles-library" ],
     "notBefore" : 0,
     "groups" : [ ]
+  }, {
+    "id" : "a77a8e42-0155-4572-ad93-022850407647",
+    "username" : "service-account-library-backend",
+    "enabled" : true,
+    "createdTimestamp" : 1795043651513,
+    "serviceAccountClientId" : "library-backend",
+    "totp" : false,
+    "credentials" : [ ],
+    "disableableCredentialTypes" : [ ],
+    "requiredActions" : [ ],
+    "clientRoles" : {
+      "realm-management" : [ "manage-users", "view-users" ]
+    },
+    "notBefore" : 0,
+    "groups" : [ ]
   } ],
   "scopeMappings" : [ {
     "clientScope" : "offline_access",
@@ -720,6 +735,36 @@
         "jsonType.label" : "String"
       }
     } ],
+    "defaultClientScopes" : [ "web-origins", "acr", "roles", "profile", "basic", "email" ],
+    "optionalClientScopes" : [ "address", "phone", "organization", "offline_access", "microprofile-jwt" ]
+  }, {
+    "id" : "f7d1229d-80f0-477b-aeb9-4560fcfa38be",
+    "clientId" : "library-backend",
+    "name" : "Library backend (service account)",
+    "description" : "Confidential client the Spring Boot backend authenticates as (client_credentials) to call the Keycloak Admin REST API - currently just deleting a user's login account when an admin deletes them.",
+    "surrogateAuthRequired" : false,
+    "enabled" : true,
+    "alwaysDisplayInConsole" : false,
+    "clientAuthenticatorType" : "client-secret",
+    "secret" : "dev-only-library-backend-secret-not-for-production",
+    "redirectUris" : [ ],
+    "webOrigins" : [ ],
+    "notBefore" : 0,
+    "bearerOnly" : false,
+    "consentRequired" : false,
+    "standardFlowEnabled" : false,
+    "implicitFlowEnabled" : false,
+    "directAccessGrantsEnabled" : false,
+    "serviceAccountsEnabled" : true,
+    "publicClient" : false,
+    "frontchannelLogout" : false,
+    "protocol" : "openid-connect",
+    "attributes" : {
+      "realm_client" : "false"
+    },
+    "authenticationFlowBindingOverrides" : { },
+    "fullScopeAllowed" : false,
+    "nodeReRegistrationTimeout" : 0,
     "defaultClientScopes" : [ "web-origins", "acr", "roles", "profile", "basic", "email" ],
     "optionalClientScopes" : [ "address", "phone", "organization", "offline_access", "microprofile-jwt" ]
   } ],

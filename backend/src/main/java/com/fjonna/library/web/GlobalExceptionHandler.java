@@ -1,5 +1,6 @@
 package com.fjonna.library.web;
 
+import com.fjonna.library.keycloakadmin.KeycloakAdminException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorBody> handleAccessDenied(AccessDeniedException ex) {
         return build(HttpStatus.FORBIDDEN, "You do not have permission to perform this action");
+    }
+
+    @ExceptionHandler(KeycloakAdminException.class)
+    public ResponseEntity<ErrorBody> handleKeycloakAdmin(KeycloakAdminException ex) {
+        log.error("Keycloak admin API call failed", ex);
+        return build(HttpStatus.BAD_GATEWAY, "Could not reach the login system right now. Please try again shortly.");
     }
 
     @ExceptionHandler(Exception.class)

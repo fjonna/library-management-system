@@ -16,7 +16,9 @@ printf 'DOMAIN=%s\nPUBLIC_URL=https://%s\n' "$DOMAIN" "$DOMAIN" >> .env
 # nginx config for this domain
 sed "s/__DOMAIN__/$DOMAIN/g" nginx/nginx.prod.conf.template > nginx/nginx.prod.conf
 
-# realm without the test users; library-frontend gets only the production redirect/origin URIs
+# realm without the test users; library-frontend gets only the production redirect/origin URIs;
+# library-backend's dev-only secret is stripped (Keycloak generates a real one on import - fetch it
+# from the admin console afterwards and put it in .env as KEYCLOAK_ADMIN_CLIENT_SECRET)
 # (re-run anytime: this regenerates the file from scratch, so it stays idempotent)
 mkdir -p keycloak/realm-prod
 jq --arg domain "$DOMAIN" '
@@ -26,6 +28,7 @@ jq --arg domain "$DOMAIN" '
       | .webOrigins = ["https://" + $domain]
       | .attributes["post.logout.redirect.uris"] = ("https://" + $domain + "/*")
     )
+  | (.clients[] | select(.clientId == "library-backend")) |= del(.secret)
 ' keycloak/realm/library-realm.json > keycloak/realm-prod/library-realm.json
 
 C="docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.prod.yml"
